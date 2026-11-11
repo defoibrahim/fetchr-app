@@ -108,13 +108,18 @@ jobs:
             exit 1
           fi
           for apk in "${apks[@]}"; do
-            "$apksigner" verify --verbose "$apk"
+            verbose="$("$apksigner" verify --verbose "$apk")"
+            echo "$verbose"
+            signers="$(echo "$verbose" | sed -n 's/^Number of signers: //p')"
             certs="$("$apksigner" verify --print-certs "$apk")"
             echo "$certs"
-            digest="$(echo "$certs" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
-            signers="$(echo "$certs" | grep -c '^Signer #[0-9]* certificate DN' || true)"
-            echo "$(basename "$apk"): $digest"
-            if [ "$signers" -ne 1 ] || [ "$digest" != "$EXPECTED_CERT_SHA256" ]; then
+            # Depending on the build-tools version and schemes, lines read
+            # "Signer #1 certificate SHA-256 digest: ..." or "V2 Signer: certificate SHA-256 digest: ...".
+            # Every scheme must carry the same single certificate.
+            digests="$(echo "$certs" | sed -n 's/^.*[Ss]igner[^:]*:\{0,1\} certificate SHA-256 digest: //p' | sort -u)"
+            digest="$(echo "$digests" | head -n1)"
+            echo "$(basename "$apk"): signers=$signers digest=$digest"
+            if [ "$signers" != "1" ] || [ "$(echo "$digests" | grep -c .)" -ne 1 ] || [ "$digest" != "$EXPECTED_CERT_SHA256" ]; then
               echo "::error::$(basename "$apk") is signed with $digest, expected $EXPECTED_CERT_SHA256"
               exit 1
             fi
