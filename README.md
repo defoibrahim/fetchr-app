@@ -101,6 +101,10 @@ A Sentry report holds the error and where it happened, the app's recent log mess
 
 You need the Android SDK with platform 37, JDK 17 and Flutter 3.47.7. [fvm](https://fvm.app) installs that Flutter for you and is what the project's scripts use. The first build downloads libmpv and youtubedl-android, so it needs a network connection.
 
+### Debug build (for development only)
+
+A quick build to try changes on your own phone. It is slower and larger than a release build, so don't use it to judge performance:
+
 ```bash
 fvm install
 fvm flutter pub get
@@ -109,7 +113,9 @@ fvm flutter build apk --debug --split-per-abi --target-platform android-arm64
 
 The APK lands in `build/app/outputs/flutter-apk/`. Always pass `--split-per-abi --target-platform`: a universal APK carries Python, FFmpeg and aria2c for every CPU type and weighs over 200 MB.
 
-For a release build, create a keystore and `android/key.properties` (gitignored) with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`, then run:
+### Release build (what the published APKs are)
+
+The APKs on the [releases page](https://github.com/defoibrahim/fetchr-app/releases) are release builds: Dart compiled ahead of time to native ARM code and signed by GitHub Actions. To make one yourself, create a keystore and `android/key.properties` (gitignored) with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`, then run:
 
 ```bash
 fvm flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64
