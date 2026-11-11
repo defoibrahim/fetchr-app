@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Home header logo tile (30 dp, radius 9, 18 dp glyph) at 4x on the 288 dp canvas Android 12+ expects;
+     its corners stay inside the 192 dp circle the system masks the splash icon to. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+    <path
+        android:fillColor="@color/splash_tile"
+        android:pathData="M120,84H168A36,36 0,0 1,204 120V168A36,36 0,0 1,168 204H120A36,36 0,0 1,84 168V120A36,36 0,0 1,120 84Z" />
+    <group
+        android:scaleX="3"
+        android:scaleY="3"
+        android:translateX="108"
+        android:translateY="108">
+        <path
+            android:pathData="M12,4L12,15M12,15L7,10M12,15L17,10M5,20L19,20"
+            android:strokeColor="@color/splash_glyph"
+            android:strokeWidth="2.4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>

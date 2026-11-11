@@ -1,0 +1,171 @@
+# Builds the release APKs, checks they carry the project's signing key and
+# attaches them to the GitHub Release for the tag.
+#
+# Repository secrets:
+#   KEYSTORE_BASE64    base64 of the PKCS12 release keystore
+#   KEYSTORE_PASSWORD  keystore password
+#   KEY_ALIAS          key alias in the keystore
+#   KEY_PASSWORD       key password (the same as KEYSTORE_PASSWORD for PKCS12)
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build and release, e.g. v1.1.5'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  FLUTTER_VERSION: '3.47.7'
+  # Must match the digest in README.md ("Check your download").
+  EXPECTED_CERT_SHA256: d7358fdf6452918085293a708db117d6a89ba6e929914642e79343d7526fa199
+  BUILD_TOOLS: '37.0.0'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+          # Full history and tags: the release notes list commits since the previous tag.
+          fetch-depth: 0
+          # Keep the job token out of .git/config; build steps run third-party code.
+          persist-credentials: false
+
+      - name: Tag matches pubspec version
+        run: |
+          version="$(sed -n 's/^version:[[:space:]]*\([^+[:space:]]*\).*/\1/p' pubspec.yaml)"
+          echo "pubspec version: $version, tag: $TAG"
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::tag $TAG does not match pubspec version $version"
+            exit 1
+          fi
+
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;${{ env.BUILD_TOOLS }}'
+          log-accepted-android-sdk-licenses: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Signing config
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          for v in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then echo "::error::secret $v is not set"; exit 1; fi
+          done
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/fetchr-release.p12
+          # storeFile resolves against android/app.
+          {
+            echo "storeFile=fetchr-release.p12"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/key.properties
+
+      # Generated code (pigeon, flutter_gen) is committed, so no build_runner step.
+      - name: Build release APKs
+        run: flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64
+
+      - name: Verify signatures
+        run: |
+          grep -q "$EXPECTED_CERT_SHA256" README.md || { echo "::error::README.md does not list digest $EXPECTED_CERT_SHA256"; exit 1; }
+          apksigner="$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner"
+          shopt -s nullglob
+          apks=(build/app/outputs/apk/release/Fetchr-*-release.apk)
+          if [ "${#apks[@]}" -ne 2 ]; then
+            echo "::error::expected 2 APKs, found ${#apks[@]}: ${apks[*]}"
+            ls -la build/app/outputs/apk/release || true
+            exit 1
+          fi
+          for apk in "${apks[@]}"; do
+            "$apksigner" verify --verbose "$apk"
+            certs="$("$apksigner" verify --print-certs "$apk")"
+            echo "$certs"
+            digest="$(echo "$certs" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+            signers="$(echo "$certs" | grep -c '^Signer #[0-9]* certificate DN' || true)"
+            echo "$(basename "$apk"): $digest"
+            if [ "$signers" -ne 1 ] || [ "$digest" != "$EXPECTED_CERT_SHA256" ]; then
+              echo "::error::$(basename "$apk") is signed with $digest, expected $EXPECTED_CERT_SHA256"
+              exit 1
+            fi
+            sha256sum "$apk"
+          done
+
+      - name: Release notes
+        run: |
+          prev="$(git describe --tags --abbrev=0 --match 'v*' "$TAG^" 2>/dev/null || true)"
+          range="${prev:+$prev..}$TAG"
+          {
+            echo "## What's new"
+            echo
+            git log --no-merges --format='- %s' "$range"
+            echo
+            echo "## Install"
+            echo
+            echo "Download the APK for your phone below. \`arm64-v8a\` fits nearly every phone from the last several years; \`armeabi-v7a\` is for older 32-bit phones. Android 8.0 or later. Install over an earlier version to update; your settings and history stay."
+            echo
+            echo "## Verify"
+            echo
+            echo "Built and signed by GitHub Actions from this repository's \`$TAG\` tag. Signing certificate SHA-256 digest:"
+            echo
+            echo '```text'
+            echo "$EXPECTED_CERT_SHA256"
+            echo '```'
+            echo
+            echo "## Source and licenses"
+            echo
+            echo "Fetchr is GPL-3.0. Its source for this release is the \`$TAG\` tag of this repository. The bundled yt-dlp, Python, FFmpeg and aria2 binaries come from [youtubedl-android](https://github.com/JunkFood02/youtubedl-android); see the README for all credits."
+            echo
+            echo "APK SHA-256 checksums:"
+            echo
+            echo '```text'
+            (cd build/app/outputs/apk/release && sha256sum Fetchr-*-release.apk)
+            echo '```'
+          } > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          else
+            gh release create "$TAG" --verify-tag --title "Fetchr ${TAG#v}" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+          gh release upload "$TAG" build/app/outputs/apk/release/Fetchr-*-release.apk --clobber
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f android/app/fetchr-release.p12 android/key.properties

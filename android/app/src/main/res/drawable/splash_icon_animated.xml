@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- splash_icon.xml playing in on Android 12+: the arrow drops into the tile from its top edge, then the tray draws
+     outward from the middle. The vector is the first frame (system draws it before the RenderThread applies any
+     valueFrom), so it must stay the start state; the last frame must equal splash_icon.xml. Docs cap a delayed start
+     at 166 ms. The longest animator ends at 800 ms, which is android:windowSplashScreenAnimationDuration in styles. -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+    <aapt:attr name="android:drawable">
+        <vector
+            android:width="288dp"
+            android:height="288dp"
+            android:viewportWidth="288"
+            android:viewportHeight="288">
+            <path
+                android:fillColor="@color/splash_tile"
+                android:pathData="M120,84H168A36,36 0,0 1,204 120V168A36,36 0,0 1,168 204H120A36,36 0,0 1,84 168V120A36,36 0,0 1,120 84Z" />
+            <group
+                android:scaleX="3"
+                android:scaleY="3"
+                android:translateX="108"
+                android:translateY="108">
+                <!-- The tile in the glyph's 24-unit grid, so the arrow is hidden until it crosses the tile's top edge. -->
+                <clip-path android:pathData="M4,-8H20A12,12 0,0 1,32 4V20A12,12 0,0 1,20 32H4A12,12 0,0 1,-8 20V4A12,12 0,0 1,4 -8Z" />
+                <group
+                    android:name="arrow"
+                    android:translateY="-26">
+                    <path
+                        android:pathData="M12,4L12,15M12,15L7,10M12,15L17,10"
+                        android:strokeColor="@color/splash_glyph"
+                        android:strokeWidth="2.4"
+                        android:strokeLineCap="round"
+                        android:strokeLineJoin="round" />
+                </group>
+                <path
+                    android:name="tray"
+                    android:pathData="M5,20L19,20"
+                    android:strokeColor="@color/splash_glyph"
+                    android:strokeWidth="2.4"
+                    android:strokeLineCap="round"
+                    android:strokeLineJoin="round"
+                    android:trimPathStart="0.5"
+                    android:trimPathEnd="0.5" />
+            </group>
+        </vector>
+    </aapt:attr>
+
+    <target android:name="arrow">
+        <aapt:attr name="android:animation">
+            <set android:ordering="sequentially">
+                <objectAnimator
+                    android:propertyName="translateY"
+                    android:valueType="floatType"
+                    android:valueFrom="-26"
+                    android:valueTo="1.2"
+                    android:duration="560"
+                    android:interpolator="@android:interpolator/accelerate_quad" />
+                <objectAnimator
+                    android:propertyName="translateY"
+                    android:valueType="floatType"
+                    android:valueFrom="1.2"
+                    android:valueTo="0"
+                    android:duration="240"
+                    android:interpolator="@android:interpolator/decelerate_quad" />
+            </set>
+        </aapt:attr>
+    </target>
+    <target android:name="tray">
+        <aapt:attr name="android:animation">
+            <set android:ordering="together">
+                <objectAnimator
+                    android:propertyName="trimPathStart"
+                    android:valueType="floatType"
+                    android:valueFrom="0.5"
+                    android:valueTo="0"
+                    android:startOffset="166"
+                    android:duration="480"
+                    android:interpolator="@android:interpolator/fast_out_slow_in" />
+                <objectAnimator
+                    android:propertyName="trimPathEnd"
+                    android:valueType="floatType"
+                    android:valueFrom="0.5"
+                    android:valueTo="1"
+                    android:startOffset="166"
+                    android:duration="480"
+                    android:interpolator="@android:interpolator/fast_out_slow_in" />
+            </set>
+        </aapt:attr>
+    </target>
+</animated-vector>

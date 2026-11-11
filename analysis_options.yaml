@@ -1,0 +1,26 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  exclude:
+    - lib/**/*.g.dart
+    - lib/**/*.config.dart
+    - lib/core/gen/**
+    - build/**
+    - android/**
+    - ios/**
+
+linter:
+  rules:
+    - always_declare_return_types
+    - avoid_dynamic_calls
+    - depend_on_referenced_packages
+    - directives_ordering
+    - prefer_const_constructors
+    - prefer_final_locals
+    - prefer_relative_imports
+    - prefer_single_quotes
+    - unawaited_futures

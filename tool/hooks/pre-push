@@ -1,0 +1,4 @@
+#!/bin/sh
+# Opt-in: the full suite takes minutes. `FULL_CHECK=1 git push` runs it.
+[ "${FULL_CHECK:-}" = 1 ] || exit 0
+exec bash "$(dirname "$0")/../check.sh" full

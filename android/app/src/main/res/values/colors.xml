@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppPalette.defaultAccent and onAccent: the icon keeps the brand lime whatever accent the user picks. -->
+    <color name="ic_launcher_background">#FFC8F03C</color>
+    <color name="ic_launcher_glyph">#FF121210</color>
+    <!-- The splash is the Home header logo tile: ink with a lime glyph on light, lime with an ink glyph on dark. -->
+    <color name="splash_background">#FFF6F5F0</color>
+    <color name="splash_tile">#FF171714</color>
+    <color name="splash_glyph">#FFC8F03C</color>
+</resources>

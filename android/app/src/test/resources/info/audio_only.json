@@ -1,0 +1,70 @@
+{
+  "_type": "video",
+  "id": "293",
+  "title": "Flickermood",
+  "thumbnail": "https://i1.sndcdn.com/artworks-000067273316-smsiqx-original.jpg",
+  "thumbnails": [
+    {
+      "url": "https://i1.sndcdn.com/artworks-000067273316-smsiqx-t500x500.jpg",
+      "height": 500,
+      "width": 500,
+      "id": "t500x500"
+    },
+    {
+      "url": "https://i1.sndcdn.com/artworks-000067273316-smsiqx-original.jpg",
+      "id": "original"
+    }
+  ],
+  "duration": 213.886,
+  "uploader": "Forss",
+  "uploader_id": "183",
+  "webpage_url": "https://soundcloud.com/forss/flickermood",
+  "original_url": "https://soundcloud.com/forss/flickermood",
+  "extractor": "soundcloud",
+  "extractor_key": "Soundcloud",
+  "upload_date": "20070922",
+  "view_count": 970697,
+  "like_count": 2617,
+  "formats": [
+    {
+      "format_id": "hls_aac_96k",
+      "ext": "m4a",
+      "acodec": "mp4a.40.2",
+      "vcodec": "none",
+      "abr": 96,
+      "protocol": "m3u8_native",
+      "container": "m4a_dash",
+      "quality": -1,
+      "format_note": null,
+      "preference": null,
+      "audio_ext": "m4a",
+      "video_ext": "none",
+      "vbr": 0,
+      "tbr": 96,
+      "resolution": "audio only",
+      "aspect_ratio": null,
+      "filesize_approx": 2566632,
+      "format": "hls_aac_96k - audio only"
+    },
+    {
+      "format_id": "hls_aac_160k",
+      "ext": "m4a",
+      "acodec": "mp4a.40.2",
+      "vcodec": "none",
+      "abr": 160,
+      "protocol": "m3u8_native",
+      "container": "m4a_dash",
+      "quality": 0,
+      "format_note": null,
+      "preference": null,
+      "audio_ext": "m4a",
+      "video_ext": "none",
+      "vbr": 0,
+      "tbr": 160,
+      "resolution": "audio only",
+      "aspect_ratio": null,
+      "filesize_approx": 4277720,
+      "format": "hls_aac_160k - audio only"
+    }
+  ]
+}

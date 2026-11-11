@@ -1,0 +1,52 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Fetchr: build release APK",
+      "detail": "arm + arm64, split per ABI, signed with android/key.properties",
+      "type": "shell",
+      "command": "fvm",
+      "args": [
+        "flutter", "build", "apk", "--release", "--split-per-abi",
+        "--target-platform", "android-arm,android-arm64"
+      ],
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Fetchr: build debug APK",
+      "detail": "arm64 only, debug key",
+      "type": "shell",
+      "command": "fvm",
+      "args": [
+        "flutter", "build", "apk", "--debug", "--split-per-abi",
+        "--target-platform", "android-arm64"
+      ],
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Fetchr: build release app bundle",
+      "detail": "AAB for Play, arm + arm64",
+      "type": "shell",
+      "command": "fvm",
+      "args": [
+        "flutter", "build", "appbundle", "--release",
+        "--target-platform", "android-arm,android-arm64"
+      ],
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Fetchr: open APK folder",
+      "type": "shell",
+      "command": "explorer",
+      "args": ["build\\app\\outputs\\flutter-apk"],
+      "presentation": { "reveal": "never" },
+      "problemMatcher": []
+    }
+  ]
+}
