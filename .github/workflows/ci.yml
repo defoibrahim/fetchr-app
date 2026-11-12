@@ -1,0 +1,110 @@
+# Checks every pull request (format, architecture gates, analyze, test) and,
+# on main, also builds the release APKs the same way release.yml does.
+#
+# The main-branch build has no signing secrets, so build.gradle.kts falls back
+# to the debug key and nothing is uploaded. Its job is to catch release-build
+# breakage before a tag and to save the Flutter, pub and Gradle caches on
+# refs/heads/main: a tag run can only restore caches from its own ref or from
+# the default branch, so these are what release.yml restores.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Newer PR pushes cancel older runs; runs on main always finish so their
+# cache saves complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Keep in step with .fvmrc and release.yml.
+  FLUTTER_VERSION: '3.47.7'
+  BUILD_TOOLS: '37.0.0'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      # The same checks as `tool/check.sh full`, minus the fvm requirement and
+      # build_runner (generated code is committed).
+      - name: Import URIs load each library once
+        run: |
+          if git grep -nE "^(import|export|part) '[^']*[^:]//" -- lib test tool; then
+            echo "::error::import URI contains '//'"
+            exit 1
+          fi
+
+      - name: Architecture gates
+        run: |
+          python3 tool/ci/arch_gates.py --self-test
+          python3 tool/ci/arch_gates.py
+
+      - name: dart format
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: flutter test
+        run: flutter test
+
+  # Release-mode build on main (and manual runs) only; pull requests never build an APK.
+  android-release-build:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # 'basic' is the open-source GitHub Actions cache backend; the default
+      # 'enhanced' provider is a commercial component with its own terms.
+      # Writes caches on main, read-only elsewhere (the action's default).
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-provider: basic
+
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;${{ env.BUILD_TOOLS }}'
+          log-accepted-android-sdk-licenses: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      # The release.yml build command, so Gradle caches the same dependency set.
+      - name: Build release APKs (debug-signed, not uploaded)
+        run: flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64
