@@ -47,7 +47,8 @@ jobs:
         run: flutter pub get
 
       # The same checks as `tool/check.sh full`, minus the fvm requirement and
-      # build_runner (generated code is committed).
+      # the build_runner regeneration/diff check (generated code is committed,
+      # so CI does not catch stale generated files).
       - name: Import URIs load each library once
         run: |
           if git grep -nE "^(import|export|part) '[^']*[^:]//" -- lib test tool; then
@@ -84,18 +85,29 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # 'basic' is the open-source GitHub Actions cache backend; the default
-      # 'enhanced' provider is a commercial component with its own terms.
-      # Writes caches on main, read-only elsewhere (the action's default).
-      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      # Gradle User Home, restored by release.yml with the same key. The key
+      # covers the Flutter version and pubspec.lock as well as the Gradle
+      # files, because the Flutter engine and plugin artifacts are most of what
+      # Gradle downloads here; a bump writes a new entry, seeded from the
+      # closest older one. actions/cache saves only when the job succeeds.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          cache-provider: basic
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-
+            gradle-${{ runner.os }}-
 
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;${{ env.BUILD_TOOLS }}'
           log-accepted-android-sdk-licenses: false
 
+      # Same Flutter SDK and pub cache keys as the check job. On main both jobs
+      # try to save them; the loser logs "Unable to reserve cache ... another
+      # job may be creating this cache", which is expected and harmless.
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable

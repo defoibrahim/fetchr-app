@@ -58,14 +58,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Restores the Gradle User Home that CI saves on main (a tag can read
-      # caches from the default branch). Read-only: this job never saves one.
-      # 'basic' is the open-source GitHub Actions cache backend; the default
-      # 'enhanced' provider is a commercial component with its own terms.
-      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      # Restores the Gradle User Home that ci.yml saves on main (a tag can read
+      # caches from the default branch). Restore-only: this job never saves
+      # one. Path, key and restore-keys must match ci.yml.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          cache-provider: basic
-          cache-read-only: true
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-
+            gradle-${{ runner.os }}-
 
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
