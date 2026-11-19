@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/gen/assets.gen.dart';
+import '../../../../../core/theme/app_motion.dart';
 import '../../../../../core/theme/app_spacing.dart';
 import '../../../../../core/theme/theme_extensions.dart';
 import '../../../../../core/utils/scale.dart';
+import '../../../../../core/widgets/app_fade_switcher.dart';
 import '../../../../../core/widgets/app_icon.dart';
 import '../../../../../core/widgets/app_icon_button.dart';
 
@@ -50,12 +52,19 @@ class UrlField extends StatelessWidget {
         builder: (context, _) {
           final filled = controller.text.isNotEmpty;
           final shown = state ?? _derive(filled);
-          return DecoratedBox(
-            decoration: BoxDecoration(
-              color: context.tokens.surface,
-              border: _border(context, shown),
-              borderRadius: BorderRadius.circular(Radii.control.r),
+          // The border eases between empty, focused and error.
+          return TweenAnimationBuilder<Decoration>(
+            tween: DecorationTween(
+              end: BoxDecoration(
+                color: context.tokens.surface,
+                border: _border(context, shown),
+                borderRadius: BorderRadius.circular(Radii.control.r),
+              ),
             ),
+            duration: context.motion(Motion.fast),
+            curve: Motion.standard,
+            builder: (_, decoration, child) =>
+                DecoratedBox(decoration: decoration, child: child),
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: AppSizes.input.h),
               child: Padding(
@@ -74,13 +83,27 @@ class UrlField extends StatelessWidget {
                       color: context.tokens.textMuted,
                     ),
                     Expanded(child: _input(context)),
-                    filled
-                        ? AppIconButton(
-                            icon: Assets.icons.close,
-                            tooltip: 'Clear URL',
-                            onPressed: onClear,
-                          )
-                        : _pasteButton(context),
+                    // Keyed by filled, not by the text: typing does not
+                    // restart it.
+                    AppFadeSwitcher(
+                      spec: Motion.fade,
+                      scaleFrom: .85,
+                      alignment: Alignment.centerRight,
+                      // Paste is wider than Clear: the field takes the room
+                      // on the swap, not in a jump once Paste has faded.
+                      sizeToIncoming: true,
+                      child: filled
+                          ? AppIconButton(
+                              key: const ValueKey('clear'),
+                              icon: Assets.icons.close,
+                              tooltip: 'Clear URL',
+                              onPressed: onClear,
+                            )
+                          : KeyedSubtree(
+                              key: const ValueKey('paste'),
+                              child: _pasteButton(context),
+                            ),
+                    ),
                   ],
                 ),
               ),

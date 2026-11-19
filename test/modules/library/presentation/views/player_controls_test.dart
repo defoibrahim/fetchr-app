@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:grabby/core/theme/theme.dart';
+import 'package:grabby/core/widgets/app_fade_switcher.dart';
+import 'package:grabby/core/widgets/app_icon.dart';
 import 'package:grabby/modules/library/presentation/views/widgets/player_controls.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:mocktail/mocktail.dart';
@@ -36,6 +39,68 @@ void main() {
 
       expect(find.byTooltip('Pause'), findsOneWidget);
       expect(find.text('0:00 / 5:00'), findsOneWidget);
+    });
+
+    testWidgets('a tap turns the icon at once; the report settles it', (
+      tester,
+    ) async {
+      await pumpPlayer(tester, videoItem);
+
+      await tester.tap(find.byTooltip('Play'));
+      await tester.pump();
+      expect(find.byTooltip('Pause'), findsOneWidget);
+
+      // The player answers playing: nothing changes.
+      await emit(tester, playing, true);
+      expect(find.byTooltip('Pause'), findsOneWidget);
+      await tester.pumpAndSettle();
+
+      // It reports paused after all (the file ended): the icon follows.
+      await emit(tester, playing, false);
+      expect(find.byTooltip('Play'), findsOneWidget);
+    });
+
+    testWidgets('a failed toggle puts the icon back', (tester) async {
+      when(
+        () => player.playOrPause(),
+      ).thenAnswer((_) async => throw StateError('gone'));
+      await pumpPlayer(tester, videoItem);
+
+      await tester.tap(find.byTooltip('Play'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.byTooltip('Play'), findsOneWidget);
+    });
+
+    testWidgets('the play and pause glyphs morph: scale 0.6 up, 180 ms', (
+      tester,
+    ) async {
+      await pumpPlayer(tester, videoItem);
+      final switcher = tester.widget<AppFadeSwitcher>(
+        inControls(find.byType(AppFadeSwitcher)),
+      );
+      expect(switcher.scaleFrom, .6);
+      expect(switcher.spec.duration, const Duration(milliseconds: 180));
+
+      await tester.tap(find.byTooltip('Play'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 90));
+      expect(inControls(find.byType(AppIcon)), findsWidgets);
+      expect(
+        find.descendant(
+          of: inControls(find.byType(AppFadeSwitcher)),
+          matching: find.byType(AppIcon),
+        ),
+        findsNWidgets(2),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: inControls(find.byType(AppFadeSwitcher)),
+          matching: find.byType(AppIcon),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('the play button toggles playback', (tester) async {
@@ -167,6 +232,26 @@ void main() {
       verify(() => player.seek(const Duration(seconds: 70))).called(1);
     });
 
+    testWidgets('a double-tap seek clicks', (tester) async {
+      await pumpPlayer(tester, videoItem);
+      await emit(tester, duration, const Duration(minutes: 5));
+      final at = mediaPoint(tester, xFraction: .85);
+      final before = platformCalls.length;
+
+      await tester.tapAt(at);
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.tapAt(at);
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(
+        platformCalls
+            .skip(before)
+            .where((call) => call.method == 'HapticFeedback.vibrate')
+            .map((call) => call.arguments),
+        ['HapticFeedbackType.selectionClick'],
+      );
+    });
+
     testWidgets('dragging the slider seeks once, where it lets go', (
       tester,
     ) async {
@@ -211,6 +296,38 @@ void main() {
       expect(overlayOpacity(tester), 1);
     });
 
+    testWidgets('a touch on the hidden overlay shows it as the finger lands', (
+      tester,
+    ) async {
+      await pumpPlayer(tester, videoItem);
+      final at = mediaPoint(tester, xFraction: .5);
+      await tapMedia(tester, at);
+      expect(overlayOpacity(tester), 0);
+
+      final gesture = await tester.startGesture(at);
+      await tester.pump();
+      // Well inside the 300 ms double-tap window.
+      expect(overlayOpacity(tester), 1);
+      final fade = overlayFade(tester);
+      expect(fade.duration, Motion.fast);
+      expect(fade.curve, Motion.enter);
+
+      await gesture.up();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      // The tap that brought it back does not hide it.
+      expect(overlayOpacity(tester), 1);
+    });
+
+    testWidgets('it hides over 250 ms on the exit curve', (tester) async {
+      await pumpPlayer(tester, videoItem);
+      await tapMedia(tester, mediaPoint(tester, xFraction: .5));
+      final fade = overlayFade(tester);
+      expect(fade.opacity, 0);
+      expect(fade.duration, Motion.medium);
+      expect(fade.curve, Motion.exit);
+    });
+
     testWidgets('a tap on the hidden overlay does not press a button', (
       tester,
     ) async {
@@ -223,6 +340,64 @@ void main() {
 
       expect(overlayOpacity(tester), 1);
       verifyNever(() => player.playOrPause());
+    });
+
+    testWidgets(
+      'a double tap on the hidden overlay seeks, even over the play button',
+      (tester) async {
+        await pumpPlayer(tester, videoItem);
+        await emit(tester, duration, const Duration(minutes: 5));
+        await emit(tester, position, const Duration(seconds: 60));
+        // Right of centre, on the play button once the overlay is up.
+        final play = tester.getCenter(find.byTooltip('Play'));
+        await tapMedia(tester, mediaPoint(tester, xFraction: .5));
+        expect(overlayOpacity(tester), 0);
+
+        await tester.tapAt(play + const Offset(4, 0));
+        await tester.pump(const Duration(milliseconds: 60));
+        await tester.tapAt(play + const Offset(4, 0));
+        await tester.pump(const Duration(milliseconds: 500));
+
+        verify(() => player.seek(const Duration(seconds: 70))).called(1);
+        verifyNever(() => player.playOrPause());
+        expect(overlayOpacity(tester), 1);
+      },
+    );
+
+    testWidgets('a double tap on the hidden overlay seeks over the slider', (
+      tester,
+    ) async {
+      await pumpPlayer(tester, videoItem);
+      await emit(tester, duration, const Duration(minutes: 5));
+      await emit(tester, position, const Duration(seconds: 60));
+      final slider = tester.getRect(inControls(find.byType(Slider)));
+      final at = Offset(slider.left + slider.width * .15, slider.center.dy);
+      await tapMedia(tester, mediaPoint(tester, xFraction: .5));
+      expect(overlayOpacity(tester), 0);
+
+      await tester.tapAt(at);
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.tapAt(at);
+      await tester.pump(const Duration(milliseconds: 500));
+
+      // Back 10 seconds, not a jump to where the finger was on the slider.
+      final seeks = verify(() => player.seek(captureAny())).captured;
+      expect(seeks, [const Duration(seconds: 50)]);
+    });
+
+    testWidgets('once a revealing tap settles, the buttons take taps again', (
+      tester,
+    ) async {
+      await pumpPlayer(tester, videoItem);
+      await tapMedia(tester, mediaPoint(tester, xFraction: .5));
+      expect(overlayOpacity(tester), 0);
+      await tapMedia(tester, mediaPoint(tester, xFraction: .5));
+      expect(overlayOpacity(tester), 1);
+
+      await tester.tap(find.byTooltip('Play'));
+      await tester.pump();
+
+      verify(() => player.playOrPause()).called(1);
     });
 
     testWidgets('hides itself 3 seconds into playback', (tester) async {
@@ -300,14 +475,7 @@ void main() {
 
       await tapMedia(tester, mediaPoint(tester, xFraction: .5));
 
-      expect(
-        tester
-            .widget<AnimatedOpacity>(
-              inControls(find.byType(AnimatedOpacity)).first,
-            )
-            .duration,
-        Duration.zero,
-      );
+      expect(overlayFade(tester).duration, Duration.zero);
     });
   });
 

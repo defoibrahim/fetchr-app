@@ -1,5 +1,6 @@
 import '../../../../core/utils/formatters.dart';
 import '../../domain/entities/library_item.dart';
+import '../../domain/extensions/library_item_extensions.dart';
 
 extension LibraryItemFormat on LibraryItem {
   /// "1080p", "720p", "MP3", or "Video" when the dimensions are not known.
@@ -34,4 +35,10 @@ extension LibraryItemFormat on LibraryItem {
     final separator = folder.isEmpty || folder.endsWith('/') ? '' : '/';
     return '$folder$separator$name';
   }
+}
+
+extension LibraryItemListFormat on List<LibraryItem> {
+  /// "12 files · 1.4 GB".
+  String get filesLine =>
+      '${plural(length, 'file')} · ${formatBytes(totalBytes)}';
 }

@@ -69,6 +69,7 @@ api.DownloadTask _apiTask({
   String? errorCode,
   String? errorMessage,
   String? savedUri,
+  String? savedPath,
   api.DownloadRequest? request,
   api.TaskStage stage = api.TaskStage.preparing,
   int? downloadedBytes,
@@ -85,6 +86,7 @@ api.DownloadTask _apiTask({
   errorCode: errorCode,
   errorMessage: errorMessage,
   savedUri: savedUri,
+  savedPath: savedPath,
   createdAtMs: 1700000000000,
   stage: stage,
   downloadedBytes: downloadedBytes,
@@ -440,6 +442,10 @@ void main() {
             run: (id) => repository.resume(id),
             native: () => hostApi.resume('task-1'),
           ),
+          'reorder': (
+            run: (id) => repository.reorder([id, 'task-2']),
+            native: () => hostApi.reorder(['task-1', 'task-2']),
+          ),
         };
 
     for (final name in operations.keys) {
@@ -663,6 +669,7 @@ void main() {
               progress: 1,
               etaSeconds: 0,
               savedUri: 'content://media/1',
+              savedPath: 'Movies/Fetchr',
             ),
           ],
         ),
@@ -676,6 +683,7 @@ void main() {
           progress: 1,
           etaSec: 0,
           savedUri: 'content://media/1',
+          savedPath: 'Movies/Fetchr',
           createdAt: DateTime.fromMillisecondsSinceEpoch(1700000000000),
         ),
       ]);

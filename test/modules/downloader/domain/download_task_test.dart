@@ -48,6 +48,26 @@ void main() {
       }
     });
 
+    test('withStatus changes the status and keeps everything else', () {
+      final task = downloadTask(
+        stage: TaskStage.downloading,
+        progress: .4,
+        etaSec: 12,
+        downloadedBytes: 40,
+        totalBytes: 100,
+        speed: 5,
+        stalled: true,
+        errorMessage: 'line',
+        savedUri: 'content://x',
+        savedPath: 'Movies/Fetchr',
+        finishedAt: DateTime(2026),
+      );
+      final paused = task.withStatus(TaskStatus.paused);
+
+      expect(paused.status, TaskStatus.paused);
+      expect(paused.withStatus(TaskStatus.running), task);
+    });
+
     test('compares by value', () {
       expect(
         downloadTask(status: TaskStatus.running),

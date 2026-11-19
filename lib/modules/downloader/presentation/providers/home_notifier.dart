@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/shared/domain/entities/quality.dart';
 import '../../../../app/shared/download_prefs_provider.dart';
+import '../../../../app/shared/platform_traits_provider.dart';
 import '../../../../core/errors/result.dart';
 import '../../../../core/usecase/base_use_case.dart';
 import '../../di/downloader_providers.dart';
@@ -109,7 +110,10 @@ class HomeNotifier extends AsyncNotifier<MediaInfo?> {
       thumbnail: thumbnail,
       quality: quality,
       folder: prefs.folder,
-      useAria2c: prefs.useAria2c,
+      // Settings hides the switch where native has no aria2c; a saved "on"
+      // must not reach it there.
+      useAria2c:
+          prefs.useAria2c && ref.read(platformTraitsProvider).supportsAria2c,
       uploader: uploader,
       durationSec: durationSec,
       playlistTitle: playlistTitle,

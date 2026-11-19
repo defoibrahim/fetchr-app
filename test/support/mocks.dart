@@ -15,6 +15,7 @@ import 'package:grabby/modules/downloader/domain/usecases/open_download_folder_u
 import 'package:grabby/modules/downloader/domain/usecases/pause_all_downloads_usecase.dart';
 import 'package:grabby/modules/downloader/domain/usecases/pause_download_usecase.dart';
 import 'package:grabby/modules/downloader/domain/usecases/remove_download_usecase.dart';
+import 'package:grabby/modules/downloader/domain/usecases/reorder_queue_usecase.dart';
 import 'package:grabby/modules/downloader/domain/usecases/resume_all_downloads_usecase.dart';
 import 'package:grabby/modules/downloader/domain/usecases/resume_download_usecase.dart';
 import 'package:grabby/modules/downloader/domain/usecases/retry_download_usecase.dart';
@@ -45,6 +46,8 @@ class MockEnqueueDownloadsUseCase extends Mock
 class MockCancelDownloadUseCase extends Mock implements CancelDownloadUseCase {}
 
 class MockRetryDownloadUseCase extends Mock implements RetryDownloadUseCase {}
+
+class MockReorderQueueUseCase extends Mock implements ReorderQueueUseCase {}
 
 class MockRemoveDownloadUseCase extends Mock implements RemoveDownloadUseCase {}
 

@@ -1,0 +1,46 @@
+[
+  {
+    "name": "CPython 3.15.2",
+    "file": "assets/licenses/ios/cpython.txt"
+  },
+  {
+    "name": "FFmpeg, FFmpegKit and LAME (libmp3lame)",
+    "file": "assets/licenses/ios/ffmpeg.txt"
+  },
+  {
+    "name": "yt-dlp 2026.10.26",
+    "file": "assets/licenses/ios/yt-dlp.txt"
+  },
+  {
+    "name": "yt-dlp-ejs 0.8.0",
+    "file": "assets/licenses/ios/yt-dlp-ejs.txt"
+  },
+  {
+    "name": "certifi 2026.10.23",
+    "file": "assets/licenses/ios/certifi.txt"
+  },
+  {
+    "name": "charset-normalizer 3.5.2",
+    "file": "assets/licenses/ios/charset-normalizer.txt"
+  },
+  {
+    "name": "idna 3.20",
+    "file": "assets/licenses/ios/idna.txt"
+  },
+  {
+    "name": "mutagen 1.48.1",
+    "file": "assets/licenses/ios/mutagen.txt"
+  },
+  {
+    "name": "requests 2.34.2",
+    "file": "assets/licenses/ios/requests.txt"
+  },
+  {
+    "name": "urllib3 2.8.0",
+    "file": "assets/licenses/ios/urllib3.txt"
+  },
+  {
+    "name": "websockets 17.4",
+    "file": "assets/licenses/ios/websockets.txt"
+  }
+]

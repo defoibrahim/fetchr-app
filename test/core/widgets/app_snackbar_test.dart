@@ -9,6 +9,7 @@ import 'package:grabby/core/theme/theme.dart';
 import 'package:grabby/core/widgets/app_icon.dart';
 import 'package:grabby/core/widgets/app_snackbar.dart';
 
+import '../../support/haptics.dart';
 import '../../support/snackbar.dart';
 import 'widget_harness.dart';
 
@@ -233,12 +234,34 @@ void main() {
     });
 
     testWidgets('shows nothing for an Ok', (tester) async {
+      final calls = recordHaptics(tester);
       final context = await pumpContext(tester);
 
       unawaited(AppSnackbar.showFailure(context, const Ok<int>(1)));
       await tester.pump();
 
       expect(find.byType(SnackBar), findsNothing);
+      expect(calls, isEmpty);
+    });
+
+    testWidgets('an Err plays the reject haptic', (tester) async {
+      final calls = recordHaptics(tester);
+      final context = await pumpContext(tester);
+
+      unawaited(AppSnackbar.showFailure(context, const Err<int>(failure)));
+      await tester.pump();
+
+      expect(calls, ['HapticFeedbackType.errorNotification']);
+    });
+
+    testWidgets('a plain error snackbar plays nothing', (tester) async {
+      final calls = recordHaptics(tester);
+      final context = await pumpContext(tester);
+
+      AppSnackbar.show(context, 'x', type: SnackType.error);
+      await tester.pump();
+
+      expect(calls, isEmpty);
     });
 
     testWidgets('waits for a future result', (tester) async {

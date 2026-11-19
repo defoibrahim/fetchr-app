@@ -17,6 +17,7 @@ import 'package:grabby/modules/library/presentation/views/widgets/library_card.d
 import 'package:mocktail/mocktail.dart';
 
 import '../../../../support/fixtures.dart';
+import '../../../../support/haptics.dart';
 import 'library_view_harness.dart';
 
 void main() {
@@ -102,7 +103,8 @@ void main() {
       await tester.pump();
 
       expect(find.byType(LoadingView), findsOneWidget);
-      expect(find.byType(ErrorView), findsNothing);
+      // The error fades out and takes no taps on the way.
+      expect(find.byType(ErrorView).hitTestable(), findsNothing);
 
       retry.complete(Ok(bothItems));
       await tester.pump();
@@ -235,6 +237,67 @@ void main() {
 
       await pickFilter(tester, 'All');
       expect(shown(tester), bothItems);
+    });
+
+    testWidgets('a new filter fades in from the top, without a scale', (
+      tester,
+    ) async {
+      stubList(
+        () async => Ok([
+          for (var i = 0; i < 30; i++)
+            libraryItem(uri: 'content://v$i', name: 'Clip $i.mp4'),
+          songItem,
+        ]),
+      );
+      await pumpLibrary(tester);
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -900));
+      await tester.pumpAndSettle();
+      double offset() => tester
+          .state<ScrollableState>(find.byType(Scrollable).last)
+          .position
+          .pixels;
+      expect(offset(), greaterThan(0));
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Video'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      // Both grids are up, the new one fading in, neither scaled.
+      expect(find.byType(CustomScrollView), findsNWidgets(2));
+      final fades = tester.widgetList<FadeTransition>(
+        find.ancestor(
+          of: find.byType(CustomScrollView),
+          matching: find.byType(FadeTransition),
+        ),
+      );
+      expect(
+        fades.any((f) => f.opacity.value > 0 && f.opacity.value < 1),
+        isTrue,
+      );
+      expect(
+        find.ancestor(
+          of: find.byType(CustomScrollView).last,
+          matching: find.byWidgetPredicate(
+            (w) => w is ScaleTransition && w.scale.value != 1,
+          ),
+        ),
+        findsNothing,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(CustomScrollView), findsOneWidget);
+      expect(offset(), 0);
+    });
+
+    testWidgets('a new filter clicks; the current one does not', (
+      tester,
+    ) async {
+      stubList(() async => Ok(bothItems));
+      await pumpLibrary(tester);
+      final calls = recordHaptics(tester);
+
+      await pickFilter(tester, 'All');
+      expect(calls, isEmpty);
+      await pickFilter(tester, 'Audio');
+      expect(calls, ['HapticFeedbackType.selectionClick']);
     });
 
     testWidgets('the header still counts every file', (tester) async {

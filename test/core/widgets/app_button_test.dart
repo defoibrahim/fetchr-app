@@ -366,6 +366,156 @@ void main() {
         );
         expect(narrow, lessThan(wide));
       });
+
+      testWidgets('a pressed filled button shows its ink on the fill', (
+        tester,
+      ) async {
+        await pump(tester, AppButton(label: 'Go', onPressed: () {}));
+        final style = tester.widget<FilledButton>(find.byType(FilledButton));
+        final ink =
+            (style.style?.overlayColor ??
+                    theme.filledButtonTheme.style!.overlayColor)!
+                .resolve({WidgetState.pressed})!;
+        expect(_sameRgb(ink, scheme.onPrimary), isTrue);
+        expect(ink.a, closeTo(.16, .001));
+      });
+
+      testWidgets('a pressed destructive button inks in onError', (
+        tester,
+      ) async {
+        await pump(
+          tester,
+          AppButton(
+            label: 'Delete',
+            variant: AppButtonVariant.destructive,
+            onPressed: () {},
+          ),
+        );
+        final button = tester.widget<FilledButton>(find.byType(FilledButton));
+        final ink = button.style!.overlayColor!.resolve({WidgetState.pressed})!;
+        expect(_sameRgb(ink, tokens.onError), isTrue);
+      });
+
+      for (final size in [AppButtonSize.large, AppButtonSize.medium]) {
+        testWidgets('${size.name} shrinks to 0.97 while held', (tester) async {
+          await pump(
+            tester,
+            AppButton(label: 'Go', size: size, onPressed: () {}),
+          );
+          double scale() => tester
+              .widget<AnimatedScale>(
+                find.ancestor(
+                  of: find.byType(FilledButton),
+                  matching: find.byType(AnimatedScale),
+                ),
+              )
+              .scale;
+          expect(scale(), 1);
+
+          final gesture = await tester.startGesture(
+            tester.getCenter(find.text('Go')),
+          );
+          await tester.pump();
+          expect(scale(), .97);
+
+          await gesture.up();
+          await tester.pump();
+          expect(scale(), 1);
+          await tester.pumpAndSettle();
+        });
+      }
+
+      testWidgets('reduce motion: a held button keeps its size', (
+        tester,
+      ) async {
+        reduceMotion(tester);
+        await pump(tester, AppButton(label: 'Go', onPressed: () {}));
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.text('Go')),
+        );
+        await tester.pump();
+        expect(
+          tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale,
+          1,
+        );
+        await gesture.up();
+        await tester.pumpAndSettle();
+      });
+
+      testWidgets('compact and small buttons do not scale', (tester) async {
+        for (final size in [AppButtonSize.compact, AppButtonSize.small]) {
+          await pump(
+            tester,
+            AppButton(label: 'Go', size: size, onPressed: () {}),
+          );
+          expect(find.byType(AnimatedScale), findsNothing, reason: size.name);
+        }
+      });
+
+      testWidgets('the label and the spinner cross-fade, then settle', (
+        tester,
+      ) async {
+        await pump(
+          tester,
+          AppButton(label: 'Save', loadingLabel: 'Saving', onPressed: () {}),
+        );
+        await pump(
+          tester,
+          AppButton(
+            label: 'Save',
+            loadingLabel: 'Saving',
+            isLoading: true,
+            onPressed: () {},
+          ),
+        );
+        await tester.pump(Motion.fast ~/ 2);
+        expect(find.text('Save'), findsOneWidget);
+        expect(find.text('Saving'), findsOneWidget);
+
+        await tester.pump(Motion.fast);
+        expect(find.text('Save'), findsNothing);
+        expect(find.text('Saving'), findsOneWidget);
+      });
+
+      testWidgets('reduce motion: the spinner replaces the label at once', (
+        tester,
+      ) async {
+        reduceMotion(tester);
+        await pump(
+          tester,
+          AppButton(label: 'Save', loadingLabel: 'Saving', onPressed: () {}),
+        );
+        await pump(
+          tester,
+          AppButton(
+            label: 'Save',
+            loadingLabel: 'Saving',
+            isLoading: true,
+            onPressed: () {},
+          ),
+        );
+        await tester.pump();
+        expect(find.text('Save'), findsNothing);
+        expect(find.text('Saving'), findsOneWidget);
+      });
+
+      testWidgets('a tap during the cross-fade is swallowed, not doubled', (
+        tester,
+      ) async {
+        var taps = 0;
+        Widget button(bool loading) => AppButton(
+          label: 'Save',
+          isLoading: loading,
+          onPressed: () => taps++,
+        );
+        await pump(tester, button(false));
+        await tester.tap(find.byType(FilledButton));
+        await pump(tester, button(true));
+        await tester.pump(Motion.fast ~/ 3);
+        await tester.tap(find.byType(FilledButton));
+        await tester.pump();
+        expect(taps, 1);
+      });
     });
   }
 }

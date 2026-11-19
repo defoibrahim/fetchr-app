@@ -428,22 +428,44 @@ void main() {
           expect(style.foregroundColor!.resolve(disabled)!.a, closeTo(.4, .01));
         });
 
-        test('press and hover ink is text at 12% and 8%', () {
-          for (final style in styles().values) {
-            expect(
-              style.overlayColor!.resolve(pressed),
-              t.text.withValues(alpha: .12),
-            );
-            expect(
-              style.overlayColor!.resolve({WidgetState.focused}),
-              t.text.withValues(alpha: .12),
-            );
-            expect(
-              style.overlayColor!.resolve(hovered),
-              t.text.withValues(alpha: .08),
-            );
-            expect(style.overlayColor!.resolve({}), isNull);
-          }
+        test(
+          'outlined and text: press and hover ink is text at 12% and 8%',
+          () {
+            for (final style in [styles()['outlined']!, styles()['text']!]) {
+              expect(
+                style.overlayColor!.resolve(pressed),
+                t.text.withValues(alpha: .12),
+              );
+              expect(
+                style.overlayColor!.resolve({WidgetState.focused}),
+                t.text.withValues(alpha: .12),
+              );
+              expect(
+                style.overlayColor!.resolve(hovered),
+                t.text.withValues(alpha: .08),
+              );
+              expect(style.overlayColor!.resolve({}), isNull);
+            }
+          },
+        );
+
+        // Text on a fill of text would not show: the ink is the label colour.
+        test('filled: press ink is onPrimary at 16%, hover at 10%', () {
+          final style = styles()['filled']!;
+          final on = theme.colorScheme.onPrimary;
+          expect(
+            style.overlayColor!.resolve(pressed),
+            on.withValues(alpha: .16),
+          );
+          expect(
+            style.overlayColor!.resolve({WidgetState.focused}),
+            on.withValues(alpha: .16),
+          );
+          expect(
+            style.overlayColor!.resolve(hovered),
+            on.withValues(alpha: .10),
+          );
+          expect(style.overlayColor!.resolve({}), isNull);
         });
 
         testWidgets('a stock FilledButton renders 48 high', (tester) async {

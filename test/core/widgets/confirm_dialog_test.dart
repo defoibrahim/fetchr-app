@@ -227,37 +227,40 @@ void main() {
     });
   }
 
-  testWidgets('confirmDeleteFile asks about the file and resolves on Delete', (
-    tester,
-  ) async {
-    bool? answer;
-    await tester.pumpWidget(
-      themed(
-        Builder(
-          builder: (context) => TextButton(
-            onPressed: () => unawaited(
-              confirmDeleteFile(
-                context,
-                'Clip',
-                meta: ('720p · MP4', '96 MB'),
-              ).then((v) => answer = v),
+  for (final (device, word) in [('phone', 'Gallery'), ('device', 'Files')]) {
+    testWidgets('confirmDeleteFile asks about the file, names $device and '
+        '$word and resolves on Delete', (tester) async {
+      bool? answer;
+      await tester.pumpWidget(
+        themed(
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () => unawaited(
+                confirmDeleteFile(
+                  context,
+                  'Clip',
+                  deviceWord: device,
+                  galleryWord: word,
+                  meta: ('720p · MP4', '96 MB'),
+                ).then((v) => answer = v),
+              ),
+              child: const Text('Open'),
             ),
-            child: const Text('Open'),
           ),
         ),
-      ),
-    );
-    await tester.tap(find.text('Open'));
-    await tester.pumpAndSettle();
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Delete this file?'), findsOneWidget);
-    expect(
-      find.text('“Clip” will be removed from your phone and from Gallery.'),
-      findsOneWidget,
-    );
-    expect(find.text('96 MB'), findsOneWidget);
-    await tester.tap(find.text('Delete'));
-    await tester.pumpAndSettle();
-    expect(answer, isTrue);
-  });
+      expect(find.text('Delete this file?'), findsOneWidget);
+      expect(
+        find.text('“Clip” will be removed from your $device and from $word.'),
+        findsOneWidget,
+      );
+      expect(find.text('96 MB'), findsOneWidget);
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(answer, isTrue);
+    });
+  }
 }

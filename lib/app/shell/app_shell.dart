@@ -6,6 +6,7 @@ import '../../core/gen/assets.gen.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/theme.dart';
 import '../../core/widgets/app_icon.dart';
+import 'app_branch_switcher.dart';
 
 final _destinations = [
   (Assets.icons.home, 'Home'),
@@ -23,12 +24,25 @@ const _barPadX = 12.0;
 const _barPadY = 12.0;
 const _tabPadX = 10.0;
 const _tabPadY = 14.0;
-const _tabSwitch = ItemAnimation();
+// The pill moves with the pages' fade-through.
+const _tabSwitch = ItemAnimation(
+  duration: AppBranchSwitcher.duration,
+  curve: Motion.standard,
+);
 
 class AppShell extends StatelessWidget {
-  const AppShell({super.key, required this.shell, this.downloadsBadge});
+  const AppShell({
+    super.key,
+    required this.shell,
+    this.downloadsBadge,
+    this.onReselect,
+  });
 
   final StatefulNavigationShell shell;
+
+  /// A tap on the tab that is already open, from the bar or the rail; the
+  /// router takes that tab's list back to the top.
+  final ValueChanged<int>? onReselect;
 
   /// Drawn over the Downloads icon; it hides itself when there is nothing to
   /// count. The shell stays free of Riverpod and of any module.
@@ -39,8 +53,11 @@ class AppShell extends StatelessWidget {
   static const _badgeTop = -6.0;
   static const _badgeEnd = -8.0;
 
-  void _select(int index) =>
-      shell.goBranch(index, initialLocation: index == shell.currentIndex);
+  void _select(int index) {
+    final again = index == shell.currentIndex;
+    if (again) onReselect?.call(index);
+    shell.goBranch(index, initialLocation: again);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,10 +109,15 @@ class AppShell extends StatelessWidget {
       curve: _tabSwitch.curve,
     );
     // A re-tap on the current tab goes to its initial location, as `_select`
-    // does for the rail: that is the package's default `selectedTabPressConfig`.
+    // does for the rail (the package's default `popAction`), and to the top
+    // through [onReselect]: the package's own scroll ignores reduce motion.
     return PersistentTabView.router(
       navigationShell: shell,
       backgroundColor: tokens.bg,
+      selectedTabPressConfig: SelectedTabPressConfig(
+        scrollToTop: false,
+        onPressed: (_) => onReselect?.call(shell.currentIndex),
+      ),
       navBarBuilder: (config) => Style8BottomNavBar(
         navBarConfig: config,
         navBarDecoration: NavBarDecoration(

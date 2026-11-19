@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:grabby/app/routes/app_routes.dart';
 import 'package:grabby/app/shared/domain/entities/quality.dart';
+import 'package:grabby/app/shell/app_branch_switcher.dart';
 import 'package:grabby/core/errors/result.dart';
 import 'package:grabby/core/theme/theme.dart';
 import 'package:grabby/modules/downloader/domain/entities/download_request.dart';
@@ -87,6 +89,7 @@ class HomeSession {
 
   final FakeApp app;
   String? clipboard;
+  int clipboardReads = 0;
   final shares = StreamController<List<SharedMediaFile>>();
 }
 
@@ -98,6 +101,7 @@ Future<HomeSession> pumpHome(
   ThemeData? theme,
   Size size = const Size(360, 800),
   TransitionBuilder? builder,
+  List<Override> overrides = const [],
 }) async {
   await pumpFakeApp(
     tester,
@@ -106,6 +110,7 @@ Future<HomeSession> pumpHome(
     theme: theme,
     size: size,
     builder: builder,
+    overrides: overrides,
   );
   final home = HomeSession(app, clipboard);
   // Not awaited: a subscriber paused by a hidden tab never takes the done
@@ -114,8 +119,11 @@ Future<HomeSession> pumpHome(
   tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
     SystemChannels.platform,
     (call) async {
-      if (call.method == 'Clipboard.getData' && home.clipboard != null) {
-        return <String, dynamic>{'text': home.clipboard};
+      if (call.method == 'Clipboard.getData') {
+        home.clipboardReads++;
+        if (home.clipboard != null) {
+          return <String, dynamic>{'text': home.clipboard};
+        }
       }
       return null;
     },
@@ -128,6 +136,8 @@ Future<HomeSession> pumpHome(
   // The first frame runs the clipboard check; the next settles its async read.
   await tester.pump();
   await tester.pump();
+  // The rest of the tab's fade-through, so Home is measured at rest.
+  await tester.pump(AppBranchSwitcher.duration);
   return home;
 }
 
@@ -193,9 +203,16 @@ Future<HomeSession> openSheet(
   Result<MediaInfo>? answer,
   Size size = const Size(360, 800),
   TransitionBuilder? builder,
+  List<Override> overrides = const [],
 }) async {
   stubFetch(app, answer ?? Ok(clipInfo));
-  final home = await pumpHome(tester, app: app, size: size, builder: builder);
+  final home = await pumpHome(
+    tester,
+    app: app,
+    size: size,
+    builder: builder,
+    overrides: overrides,
+  );
   await typeUrl(tester, clipUrl);
   await getFormats(tester);
   return home;

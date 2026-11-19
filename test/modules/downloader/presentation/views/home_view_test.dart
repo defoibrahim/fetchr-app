@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:grabby/app/routes/app_routes.dart';
 import 'package:grabby/app/shared/domain/entities/quality.dart';
 import 'package:grabby/app/shared/domain/entities/yt_dlp_status.dart';
+import 'package:grabby/app/shared/platform_traits_provider.dart';
 import 'package:grabby/core/errors/failure.dart';
 import 'package:grabby/core/errors/result.dart';
 import 'package:grabby/core/gen/assets.gen.dart';
@@ -260,6 +261,9 @@ void main() {
       await pumpHome(tester, app: app);
 
       await typeUrl(tester, clipUrl);
+      // Paste fades out and takes no taps on the way.
+      expect(find.text('Paste').hitTestable(), findsNothing);
+      await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('Paste'), findsNothing);
       expect(find.byTooltip('Clear URL'), findsOneWidget);
 
@@ -283,6 +287,56 @@ void main() {
 
       await typeUrl(tester, 'watch this $clipUrl now');
       expect(button().onPressed, isNotNull);
+    });
+
+    // iOS asks the user before an app reads the clipboard and blocks the app's
+    // main thread until they answer, so Home only reads it on a Paste tap.
+    group("platform traits keep Android's copy", () {
+      testWidgets('the clipboard is read on start and on resume', (
+        tester,
+      ) async {
+        final home = await pumpHome(
+          tester,
+          app: app,
+          clipboard: clipUrl,
+          overrides: [
+            platformTraitsProvider.overrideWithValue(PlatformTraits.android),
+          ],
+        );
+        expect(home.clipboardReads, 1);
+
+        await resumeApp(tester);
+        await tester.pump();
+
+        expect(home.clipboardReads, 2);
+      });
+    });
+
+    group('iOS traits', () {
+      testWidgets('the clipboard is read only when Paste is tapped', (
+        tester,
+      ) async {
+        final home = await pumpHome(
+          tester,
+          app: app,
+          clipboard: clipUrl,
+          overrides: [
+            platformTraitsProvider.overrideWithValue(PlatformTraits.ios),
+          ],
+        );
+        await resumeApp(tester);
+        await tester.pump();
+
+        expect(home.clipboardReads, 0);
+        expect(find.textContaining(clipUrl), findsNothing);
+
+        await tester.tap(find.text('Paste'));
+        await tester.pump();
+        await tester.pump();
+
+        expect(home.clipboardReads, 1);
+        expect(fieldText(tester), clipUrl);
+      });
     });
 
     testWidgets('Paste fills the field with the link in the clipboard', (

@@ -10,7 +10,11 @@
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
   <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
   <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
-  <application android:label="Fetchr" android:name=".FetchrApp" android:icon="@mipmap/ic_launcher">
+  <!-- enableOnBackInvokedCallback: from Android 13 back goes through
+       OnBackInvokedCallback. From Android 14 a back swipe also sends its
+       progress, so a route can peek at the page under it (on 14 only with the
+       developer option on). -->
+  <application android:label="Fetchr" android:name=".FetchrApp" android:icon="@mipmap/ic_launcher" android:enableOnBackInvokedCallback="true">
     <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask" android:taskAffinity="" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">
       <!-- Specifies an Android theme to apply to this Activity as soon as
                  the Android process has started. This theme is visible to the user

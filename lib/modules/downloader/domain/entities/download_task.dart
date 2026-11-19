@@ -20,6 +20,7 @@ class DownloadTask extends Equatable {
     this.failure,
     this.errorMessage,
     this.savedUri,
+    this.savedPath,
     this.stage = TaskStage.preparing,
     this.downloadedBytes,
     this.totalBytes,
@@ -40,6 +41,10 @@ class DownloadTask extends Equatable {
   /// The raw yt-dlp error line, for an `unknown` failure the user may report.
   final String? errorMessage;
   final String? savedUri;
+
+  /// Where the file was saved, "Movies/Fetchr/Road trip"; null for one
+  /// saved before native recorded it.
+  final String? savedPath;
   final DateTime createdAt;
   final TaskStage stage;
   final int? downloadedBytes;
@@ -66,6 +71,27 @@ class DownloadTask extends Equatable {
   /// The saved file, once the download has completed.
   String? get fileUri => status == TaskStatus.completed ? savedUri : null;
 
+  /// This task as it will be once native applies [next]: shown the moment
+  /// the user asks, before the snapshot that confirms it.
+  DownloadTask withStatus(TaskStatus next) => DownloadTask(
+    id: id,
+    request: request,
+    status: next,
+    progress: progress,
+    createdAt: createdAt,
+    etaSec: etaSec,
+    failure: failure,
+    errorMessage: errorMessage,
+    savedUri: savedUri,
+    savedPath: savedPath,
+    stage: stage,
+    downloadedBytes: downloadedBytes,
+    totalBytes: totalBytes,
+    speedBytesPerSec: speedBytesPerSec,
+    stalled: stalled,
+    finishedAt: finishedAt,
+  );
+
   DownloadCardState get cardState => switch (status) {
     TaskStatus.running => switch (stage) {
       TaskStage.preparing => DownloadCardState.preparing,
@@ -89,6 +115,7 @@ class DownloadTask extends Equatable {
     failure,
     errorMessage,
     savedUri,
+    savedPath,
     createdAt,
     stage,
     downloadedBytes,

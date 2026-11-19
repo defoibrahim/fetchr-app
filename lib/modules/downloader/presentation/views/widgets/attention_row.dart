@@ -33,8 +33,11 @@ class AttentionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final denied = task.failure is StoragePermissionFailure;
     final line = _rawLine(task);
+    // A ripple on tap, no press scale: the card holds its own buttons.
     final card = ErrorCard(
       layout: ErrorCardLayout.compact,
+      onTap: line == null ? null : () => showRawErrorDialog(context, line),
+      tapHint: 'Show error details',
       data: ErrorCardData(
         icon: Assets.icons.alertCircle,
         title: task.request.title,
@@ -51,17 +54,7 @@ class AttentionRow extends StatelessWidget {
     return Row(
       spacing: Gap.sm.w,
       children: [
-        Expanded(
-          child: line == null
-              ? card
-              : Semantics(
-                  onTapHint: 'Show error details',
-                  child: GestureDetector(
-                    onTap: () => showRawErrorDialog(context, line),
-                    child: card,
-                  ),
-                ),
-        ),
+        Expanded(child: card),
         AppIconButton(
           icon: Assets.icons.close,
           tooltip: 'Remove',

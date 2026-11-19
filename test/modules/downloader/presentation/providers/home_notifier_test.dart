@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:grabby/app/di/core_providers.dart';
 import 'package:grabby/app/shared/domain/entities/quality.dart';
 import 'package:grabby/app/shared/download_prefs_provider.dart';
 import 'package:grabby/core/errors/failure.dart';
 import 'package:grabby/core/errors/result.dart';
+import 'package:grabby/core/platform/platform_traits.dart';
 import 'package:grabby/core/usecase/base_use_case.dart';
 import 'package:grabby/modules/downloader/di/downloader_providers.dart';
 import 'package:grabby/modules/downloader/domain/entities/download_request.dart';
@@ -65,6 +67,20 @@ void main() {
 
   HomeNotifier notifier() => container.read(homeNotifierProvider.notifier);
 
+  void useTraits(PlatformTraits traits) {
+    container = ProviderContainer(
+      overrides: [
+        fetchMediaInfoUseCaseProvider.overrideWithValue(fetchInfo),
+        enqueueDownloadsUseCaseProvider.overrideWithValue(enqueue),
+        getFreeSpaceUseCaseProvider.overrideWithValue(freeSpace),
+        downloadPrefsProvider.overrideWith(() => FixedPrefs(prefs)),
+        platformTraitsProvider.overrideWithValue(traits),
+      ],
+    );
+    // An autoDispose provider lives only while something listens to it.
+    container.listen(homeNotifierProvider, (_, _) {});
+  }
+
   setUpAll(() {
     registerFallbackValue(<DownloadRequest>[]);
     registerFallbackValue(const NoParams());
@@ -74,20 +90,11 @@ void main() {
     fetchInfo = MockFetchMediaInfoUseCase();
     enqueue = MockEnqueueDownloadsUseCase();
     freeSpace = MockGetFreeSpaceUseCase();
-    container = ProviderContainer(
-      overrides: [
-        fetchMediaInfoUseCaseProvider.overrideWithValue(fetchInfo),
-        enqueueDownloadsUseCaseProvider.overrideWithValue(enqueue),
-        getFreeSpaceUseCaseProvider.overrideWithValue(freeSpace),
-        downloadPrefsProvider.overrideWith(() => FixedPrefs(prefs)),
-      ],
-    );
+    useTraits(PlatformTraits.android);
     when(() => enqueue(any())).thenAnswer((_) async => const Ok<void>(null));
     when(
       () => freeSpace(const NoParams()),
     ).thenAnswer((_) async => const Ok(1000));
-    // An autoDispose provider lives only while something listens to it.
-    container.listen(homeNotifierProvider, (_, _) {});
   });
 
   tearDown(() => container.dispose());
@@ -232,6 +239,33 @@ void main() {
         ]);
       },
     );
+
+    group("platform traits keep Android's copy", () {
+      test('the saved aria2c choice goes with the request', () async {
+        await notifier().download(video, Quality.best);
+
+        expect(enqueued().single.useAria2c, isTrue);
+      });
+    });
+
+    group('iOS traits', () {
+      test('aria2c is never asked for, whatever was saved', () async {
+        container.dispose();
+        useTraits(PlatformTraits.ios);
+        await notifier().download(video, Quality.best);
+        await notifier().downloadPlaylist(playlist, Quality.mp3, [0]);
+
+        final batches = verify(() => enqueue(captureAny())).captured;
+        expect(
+          [
+            for (final batch in batches)
+              for (final request in batch as List<DownloadRequest>)
+                request.useAria2c,
+          ],
+          [false, false],
+        );
+      });
+    });
 
     test('hands back the use case failure', () async {
       when(() => enqueue(any())).thenAnswer((_) async => const Err(failure));

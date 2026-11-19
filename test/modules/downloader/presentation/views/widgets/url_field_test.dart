@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:grabby/core/gen/fonts.gen.dart';
 import 'package:grabby/core/theme/theme.dart';
 import 'package:grabby/core/utils/scale.dart';
+import 'package:grabby/core/widgets/app_fade_switcher.dart';
 import 'package:grabby/core/widgets/app_icon.dart';
 import 'package:grabby/modules/downloader/presentation/views/widgets/url_field.dart';
 
@@ -134,9 +135,36 @@ void main() {
 
         await tester.enterText(find.byType(TextField), 'https://x.test');
         await tester.pump();
+        // Both are up while they cross-fade, Paste no longer tappable.
+        await tester.pump(const Duration(milliseconds: 75));
+        expect(find.text('Paste').hitTestable(), findsNothing);
+        expect(find.byTooltip('Clear URL'), findsOneWidget);
+        await tester.pumpAndSettle();
 
         expect(find.text('Paste'), findsNothing);
         expect(find.byTooltip('Clear URL'), findsOneWidget);
+      });
+
+      testWidgets('the swap grows Clear from 0.85 over 150 ms', (tester) async {
+        await pump(tester);
+        final switcher = tester.widget<AppFadeSwitcher>(
+          find.byType(AppFadeSwitcher),
+        );
+        expect(switcher.scaleFrom, .85);
+        expect(switcher.spec, Motion.fade);
+      });
+
+      testWidgets('reduce motion: the swap and the border are instant', (
+        tester,
+      ) async {
+        reduceMotion(tester);
+        await pump(tester);
+        focus.requestFocus();
+        await tester.enterText(find.byType(TextField), 'https://x.test');
+        await tester.pump();
+        await tester.pump();
+        expect(find.text('Paste'), findsNothing);
+        expect(borderOf(tester), Border.all(color: primary));
       });
 
       testWidgets('focused: the border is the primary colour', (tester) async {
@@ -144,6 +172,11 @@ void main() {
 
         focus.requestFocus();
         await tester.pump();
+        // It eases from the plain border over 150 ms.
+        await tester.pump(const Duration(milliseconds: 75));
+        expect(borderOf(tester), isNot(Border.all(color: primary)));
+        expect(borderOf(tester), isNot(Border.all(color: tokens.border)));
+        await tester.pumpAndSettle();
 
         expect(borderOf(tester), Border.all(color: primary));
         // Empty and focused still offers Paste.

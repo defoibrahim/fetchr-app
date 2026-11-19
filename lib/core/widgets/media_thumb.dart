@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../gen/assets.gen.dart';
+import '../theme/app_motion.dart';
 import '../theme/app_spacing.dart';
 import '../theme/theme_extensions.dart';
 import '../utils/scale.dart';
@@ -15,7 +16,6 @@ const _badgeRadius = 4.0;
 const _badgePadX = 4.0;
 const _badgePadY = 1.0;
 const _dimmedOpacity = 0.6;
-const _fade = Duration(milliseconds: 150);
 
 /// The image for a thumbnail URL from yt-dlp, which may be missing or empty.
 ImageProvider? networkThumb(String? url) =>
@@ -143,7 +143,7 @@ class MediaThumb extends StatelessWidget {
     if (wasSynchronouslyLoaded) return child;
     return AnimatedOpacity(
       opacity: frame == null ? 0 : 1,
-      duration: context.motion(_fade),
+      duration: context.motion(Motion.fast),
       child: child,
     );
   }

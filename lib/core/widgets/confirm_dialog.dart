@@ -34,16 +34,20 @@ Future<bool> showConfirmDialog(
   return confirmed ?? false;
 }
 
-/// The one question before a downloaded file leaves the phone. [meta] is the
-/// format and size strip.
+/// The one question before a downloaded file leaves the device. [deviceWord]
+/// and [galleryWord] name the device and the app the file also shows up in;
+/// [meta] is the format and size strip.
 Future<bool> confirmDeleteFile(
   BuildContext context,
   String name, {
+  required String deviceWord,
+  required String galleryWord,
   (String, String)? meta,
 }) => showConfirmDialog(
   context,
   title: 'Delete this file?',
-  message: '“$name” will be removed from your phone and from Gallery.',
+  message:
+      '“$name” will be removed from your $deviceWord and from $galleryWord.',
   confirmLabel: 'Delete',
   icon: Assets.icons.trash,
   meta: meta,
@@ -103,19 +107,21 @@ class _ConfirmDialog extends StatelessWidget {
 }
 
 /// The two buttons at the foot of a dialog: an outlined [cancelLabel] that
-/// closes it with no value, and [confirmLabel].
+/// closes it with [cancelResult] (no value by default), and [confirmLabel].
 class DialogActions extends StatelessWidget {
   const DialogActions({
     super.key,
     required this.confirmLabel,
     required this.onConfirm,
     this.cancelLabel = 'Cancel',
+    this.cancelResult,
     this.destructive = false,
   });
 
   final String confirmLabel;
   final VoidCallback onConfirm;
   final String cancelLabel;
+  final Object? cancelResult;
   final bool destructive;
 
   @override
@@ -127,7 +133,7 @@ class DialogActions extends StatelessWidget {
           label: cancelLabel,
           variant: AppButtonVariant.outlined,
           size: AppButtonSize.medium,
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(cancelResult),
         ),
       ),
       Expanded(

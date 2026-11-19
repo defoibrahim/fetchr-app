@@ -65,3 +65,9 @@ sentry-wizard.exe
 /PROGRESS.md
 /progress.json
 /docs/plans/
+
+# iOS native artefacts (built by tool/ios scripts)
+/ios/Python.xcframework/
+/ios/app_packages/
+/ios/Frameworks/ffmpegkit/
+/ios/Flutter/Signing.xcconfig

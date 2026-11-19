@@ -186,6 +186,13 @@ class $AssetsImagesGen {
   List<String> get values => [aGitkeep];
 }
 
+class $AssetsLicensesGen {
+  const $AssetsLicensesGen();
+
+  /// Directory path: assets/licenses/ios
+  $AssetsLicensesIosGen get ios => const $AssetsLicensesIosGen();
+}
+
 class $AssetsFontsBricolageGen {
   const $AssetsFontsBricolageGen();
 
@@ -216,10 +223,67 @@ class $AssetsFontsJetBrainsMonoGen {
   List<String> get values => [ofl];
 }
 
+class $AssetsLicensesIosGen {
+  const $AssetsLicensesIosGen();
+
+  /// File path: assets/licenses/ios/certifi.txt
+  String get certifi => 'assets/licenses/ios/certifi.txt';
+
+  /// File path: assets/licenses/ios/charset-normalizer.txt
+  String get charsetNormalizer => 'assets/licenses/ios/charset-normalizer.txt';
+
+  /// File path: assets/licenses/ios/cpython.txt
+  String get cpython => 'assets/licenses/ios/cpython.txt';
+
+  /// File path: assets/licenses/ios/ffmpeg.txt
+  String get ffmpeg => 'assets/licenses/ios/ffmpeg.txt';
+
+  /// File path: assets/licenses/ios/idna.txt
+  String get idna => 'assets/licenses/ios/idna.txt';
+
+  /// File path: assets/licenses/ios/manifest.json
+  String get manifest => 'assets/licenses/ios/manifest.json';
+
+  /// File path: assets/licenses/ios/mutagen.txt
+  String get mutagen => 'assets/licenses/ios/mutagen.txt';
+
+  /// File path: assets/licenses/ios/requests.txt
+  String get requests => 'assets/licenses/ios/requests.txt';
+
+  /// File path: assets/licenses/ios/urllib3.txt
+  String get urllib3 => 'assets/licenses/ios/urllib3.txt';
+
+  /// File path: assets/licenses/ios/websockets.txt
+  String get websockets => 'assets/licenses/ios/websockets.txt';
+
+  /// File path: assets/licenses/ios/yt-dlp-ejs.txt
+  String get ytDlpEjs => 'assets/licenses/ios/yt-dlp-ejs.txt';
+
+  /// File path: assets/licenses/ios/yt-dlp.txt
+  String get ytDlp => 'assets/licenses/ios/yt-dlp.txt';
+
+  /// List of all assets
+  List<String> get values => [
+    certifi,
+    charsetNormalizer,
+    cpython,
+    ffmpeg,
+    idna,
+    manifest,
+    mutagen,
+    requests,
+    urllib3,
+    websockets,
+    ytDlpEjs,
+    ytDlp,
+  ];
+}
+
 abstract final class Assets {
   static const $AssetsFontsGen fonts = $AssetsFontsGen();
   static const $AssetsIconsGen icons = $AssetsIconsGen();
   static const $AssetsImagesGen images = $AssetsImagesGen();
+  static const $AssetsLicensesGen licenses = $AssetsLicensesGen();
 }
 
 class SvgGenImage {

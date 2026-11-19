@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert' show jsonDecode;
+import 'dart:io' show Platform;
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/foundation.dart'
-    show LicenseEntryWithLineBreaks, LicenseRegistry;
+    show LicenseEntryWithLineBreaks, LicenseRegistry, defaultTargetPlatform;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,10 +12,13 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../../core/config/environment.dart';
 import '../../core/crash/crash_reporting.dart';
+import '../../core/crash/crash_reporting_policy.dart';
 import '../../core/crash/sentry_reporter.dart';
 import '../../core/gen/assets.gen.dart' show Assets;
+import '../../core/platform/platform_traits.dart';
 import '../app.dart';
 import '../di/core_providers.dart';
+import '../launch/launch_intro.dart';
 import '../theme/system_bars.dart';
 import 'app_initializer.dart';
 import 'provider_error_observer.dart';
@@ -26,9 +31,27 @@ final _fontLicenses = {
 
 /// The OFL requires the licence to travel with the font; this puts it on
 /// Flutter's licence page.
-void registerFontLicenses() {
+void registerFontLicenses() => _addLicenses(
+  () async => _fontLicenses.entries.map((e) => (e.key, e.value)),
+);
+
+/// Python, FFmpeg and the Python packages ship inside the iOS app; their
+/// licences go on the licence page next to the Dart packages'.
+void registerNativeLicenses(PlatformTraits traits) {
+  final manifest = traits.nativeLicenseManifest;
+  if (manifest == null) return;
+  _addLicenses(() async {
+    final entries = jsonDecode(await rootBundle.loadString(manifest)) as List;
+    return [
+      for (final entry in entries.cast<Map<String, dynamic>>())
+        (entry['name'] as String, entry['file'] as String),
+    ];
+  });
+}
+
+void _addLicenses(Future<Iterable<(String, String)>> Function() entries) {
   LicenseRegistry.addLicense(() async* {
-    for (final MapEntry(key: name, value: asset) in _fontLicenses.entries) {
+    for (final (name, asset) in await entries()) {
       yield LicenseEntryWithLineBreaks([
         name,
       ], await rootBundle.loadString(asset));
@@ -39,6 +62,7 @@ void registerFontLicenses() {
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
   registerFontLicenses();
+  registerNativeLicenses(PlatformTraits.of(defaultTargetPlatform));
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
@@ -59,20 +83,28 @@ Future<void> bootstrap() async {
     observers: const [ProviderErrorObserver()],
   );
   await AppInitializer.init(container);
+  // A notification tap opens its own screen (fetchr://app/...), which the
+  // intro would cover and then have no Home header to land on.
+  final deepLinked = launchedOnDeepLink(
+    PlatformDispatcher.instance.defaultRouteName,
+  );
   final app = SentryWidget(
     child: UncontrolledProviderScope(
       container: container,
       child: App(
-        splashGone: () =>
-            container.read(fetchrHostApiProvider).awaitLaunchSplash(),
+        splashGone: deepLinked
+            ? null
+            : () => container.read(fetchrHostApiProvider).awaitLaunchSplash(),
       ),
     ),
   );
 
   CrashReporting.add(SentryReporter());
   await SentryFlutter.init((options) {
-    options.dsn =
-        'https://725d369cecc1dd62beeed717e0a3d529@o4512254526750720.ingest.de.sentry.io/4512254556569680';
+    // An empty DSN turns Sentry off, native hang reports included.
+    options.dsn = reportsCrashes(Platform.environment)
+        ? 'https://725d369cecc1dd62beeed717e0a3d529@o4512254526750720.ingest.de.sentry.io/4512254556569680'
+        : '';
     options.environment = Environment.current.flavorName;
     // Replays only for sessions that hit an error. The default masking stays
     // on: every text and image is blanked in the recording.

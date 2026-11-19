@@ -40,11 +40,25 @@ object RequestBuilder {
         return parsed
     }
 
-    fun safeFolder(name: String): String =
+    private fun folderSegment(name: String): String =
         name.filterNot { it in FOLDER_FORBIDDEN || it.isISOControl() }
             .trimStart { it == '.' || it.isWhitespace() }
-            .trimEnd()
-            .ifEmpty { DEFAULT_FOLDER }
+
+    fun safeFolder(name: String): String = folderSegment(name).trimEnd().ifEmpty { DEFAULT_FOLDER }
+
+    // A playlist's videos go into a folder named after it, inside the user's folder.
+    fun saveFolder(req: DownloadRequest): String {
+        val root = safeFolder(req.folder)
+        val playlist = req.playlistTitle?.let(::folderSegment)?.take(MAX_NAME)?.trimEnd()
+        return if (playlist.isNullOrEmpty()) root else "$root/$playlist"
+    }
+
+    // "03 - " before a playlist entry's name, padded to the playlist's width, so its files sort in playlist order.
+    private fun outputTemplate(req: DownloadRequest): String {
+        val index = req.playlistIndex ?: return OUTPUT_TEMPLATE
+        val width = maxOf(2, (req.playlistCount ?: index).toString().length)
+        return "${index.toString().padStart(width, '0')} - $OUTPUT_TEMPLATE"
+    }
 
     // A file name for yt-dlp's -o, where % starts a template field.
     fun safeFileName(name: String): String =
@@ -87,7 +101,7 @@ object RequestBuilder {
             .addOption("--no-playlist")
             .addOption("--no-mtime")
             .addOption("--cache-dir", ytDlpCache(cacheDir))
-            .addOption("-o", File(outDir, OUTPUT_TEMPLATE).path)
+            .addOption("-o", File(outDir, outputTemplate(req)).path)
             .addOption("-N", CONCURRENT_FRAGMENTS)
         when (req.quality) {
             Quality.MP3 -> request.mp3(outDir)

@@ -6,6 +6,8 @@ import 'package:pigeon/pigeon.dart';
     dartPackageName: 'grabby',
     kotlinOut:
         'android/app/src/main/kotlin/com/defo/fetchr/pigeon/FetchrApi.g.kt',
+    swiftOut: 'ios/Runner/Pigeon/FetchrApi.g.swift',
+    swiftOptions: SwiftOptions(errorClassName: 'FetchrError'),
     kotlinOptions: KotlinOptions(
       package: 'com.defo.fetchr.pigeon',
       errorClassName: 'FetchrError',
@@ -111,6 +113,7 @@ class DownloadTask {
     this.errorCode,
     this.errorMessage,
     this.savedUri,
+    this.savedPath,
     required this.createdAtMs,
     required this.stage,
     this.downloadedBytes,
@@ -127,6 +130,8 @@ class DownloadTask {
   String? errorCode; // same snake_case codes as FetchrError.code
   String? errorMessage;
   String? savedUri;
+  String?
+  savedPath; // "Movies/Fetchr/Road trip"; null for files saved before 1.1.6
   int createdAtMs;
   TaskStage stage;
   int? downloadedBytes;
@@ -180,6 +185,10 @@ abstract class FetchrHostApi {
   void enqueue(List<DownloadRequest> requests);
   void cancel(String id);
   void retry(String id);
+
+  /// The queued tasks of [ids] start in that order, before the other queued
+  /// ones that come after them.
+  void reorder(List<String> ids);
   void pause(String id);
   void resume(String id);
   void pauseAll();
@@ -217,6 +226,13 @@ abstract class FetchrHostApi {
   YtDlpStatus updateYtDlp();
   void setYtDlpAutoUpdate(bool enabled);
   void setAccentColor(int argb);
+  // libmpv handles of open players, so MainActivity can detach them before the
+  // engine goes; see MpvGuard.kt.
+  void trackPlayer(int handle);
+  void untrackPlayer(int handle);
+  // Build.VERSION.SDK_INT, read once at startup: haptics below API 30 fall
+  // back to impacts, since the notification ones play nothing there.
+  int androidSdkInt();
   // Completes once the launch splash has played its icon animation and gone,
   // so the Flutter intro starts from the same frame; at once on Android 8-11.
   @async

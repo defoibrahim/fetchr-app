@@ -6,6 +6,7 @@ import '../errors/result.dart';
 import '../gen/assets.gen.dart';
 import '../theme/app_spacing.dart';
 import '../theme/theme_extensions.dart';
+import '../utils/haptics.dart';
 import '../utils/scale.dart';
 import 'app_icon.dart';
 
@@ -46,7 +47,7 @@ abstract final class AppSnackbar {
     final closed = show(
       context,
       message,
-      action: ('Undo', () {}),
+      action: ('Undo', AppHaptics.select),
       duration: undoDuration,
     ).closed;
     return await closed == SnackBarClosedReason.action;
@@ -76,6 +77,7 @@ abstract final class AppSnackbar {
     final resolved = await result;
     if (!context.mounted) return;
     if (resolved case Err(:final failure)) {
+      AppHaptics.reject();
       show(context, failure.message, type: SnackType.error);
     }
   }

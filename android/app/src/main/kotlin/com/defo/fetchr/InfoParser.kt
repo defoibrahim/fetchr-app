@@ -11,6 +11,7 @@ import org.json.JSONObject
 
 object InfoParser {
     private val VIDEO_TIERS = listOf(Quality.BEST, Quality.P1080, Quality.P720, Quality.P480)
+    private val YOUTUBE_PLACEHOLDER_TITLES = setOf("[Private video]", "[Deleted video]")
 
     // yt-dlp's bytes per second for one kbit/s.
     private const val BYTES_PER_KBIT = 125
@@ -160,12 +161,21 @@ object InfoParser {
 
     private fun entries(array: JSONArray?): List<PlaylistEntry> = objects(array).mapNotNull { e ->
         val entryUrl = e.str("url") ?: e.str("webpage_url") ?: return@mapNotNull null
+        if (isDeadYouTubeEntry(e)) return@mapNotNull null
         PlaylistEntry(
             url = entryUrl,
             title = e.str("title") ?: entryUrl,
             thumbnail = e.thumbnail(),
             durationSeconds = e.long("duration"),
         )
+    }
+
+    // A private, deleted or otherwise unavailable YouTube video keeps its slot in a flat playlist with a placeholder
+    // title or none, and only fails once downloaded. Other sites can leave the title out of a working entry.
+    private fun isDeadYouTubeEntry(e: JSONObject): Boolean {
+        if (e.str("ie_key") != "Youtube") return false
+        val title = e.str("title")
+        return title == null || title in YOUTUBE_PLACEHOLDER_TITLES
     }
 
     private fun objects(array: JSONArray?): List<JSONObject> =

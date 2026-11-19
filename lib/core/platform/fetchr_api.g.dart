@@ -441,6 +441,7 @@ class DownloadTask {
     this.errorCode,
     this.errorMessage,
     this.savedUri,
+    this.savedPath,
     required this.createdAtMs,
     required this.stage,
     this.downloadedBytes,
@@ -466,6 +467,8 @@ class DownloadTask {
 
   String? savedUri;
 
+  String? savedPath;
+
   int createdAtMs;
 
   TaskStage stage;
@@ -490,6 +493,7 @@ class DownloadTask {
       errorCode,
       errorMessage,
       savedUri,
+      savedPath,
       createdAtMs,
       stage,
       downloadedBytes,
@@ -515,13 +519,14 @@ class DownloadTask {
       errorCode: result[5] as String?,
       errorMessage: result[6] as String?,
       savedUri: result[7] as String?,
-      createdAtMs: result[8]! as int,
-      stage: result[9]! as TaskStage,
-      downloadedBytes: result[10] as int?,
-      totalBytes: result[11] as int?,
-      speedBytesPerSec: result[12] as int?,
-      stalled: result[13]! as bool,
-      finishedAtMs: result[14] as int?,
+      savedPath: result[8] as String?,
+      createdAtMs: result[9]! as int,
+      stage: result[10]! as TaskStage,
+      downloadedBytes: result[11] as int?,
+      totalBytes: result[12] as int?,
+      speedBytesPerSec: result[13] as int?,
+      stalled: result[14]! as bool,
+      finishedAtMs: result[15] as int?,
     );
   }
 
@@ -542,6 +547,7 @@ class DownloadTask {
         _deepEquals(errorCode, other.errorCode) &&
         _deepEquals(errorMessage, other.errorMessage) &&
         _deepEquals(savedUri, other.savedUri) &&
+        _deepEquals(savedPath, other.savedPath) &&
         _deepEquals(createdAtMs, other.createdAtMs) &&
         _deepEquals(stage, other.stage) &&
         _deepEquals(downloadedBytes, other.downloadedBytes) &&
@@ -557,7 +563,7 @@ class DownloadTask {
 
   @override
   String toString() {
-    return 'DownloadTask(id: $id, request: $request, status: $status, progress: $progress, etaSeconds: $etaSeconds, errorCode: $errorCode, errorMessage: $errorMessage, savedUri: $savedUri, createdAtMs: $createdAtMs, stage: $stage, downloadedBytes: $downloadedBytes, totalBytes: $totalBytes, speedBytesPerSec: $speedBytesPerSec, stalled: $stalled, finishedAtMs: $finishedAtMs)';
+    return 'DownloadTask(id: $id, request: $request, status: $status, progress: $progress, etaSeconds: $etaSeconds, errorCode: $errorCode, errorMessage: $errorMessage, savedUri: $savedUri, savedPath: $savedPath, createdAtMs: $createdAtMs, stage: $stage, downloadedBytes: $downloadedBytes, totalBytes: $totalBytes, speedBytesPerSec: $speedBytesPerSec, stalled: $stalled, finishedAtMs: $finishedAtMs)';
   }
 }
 
@@ -934,6 +940,28 @@ class FetchrHostApi {
     );
   }
 
+  /// The queued tasks of [ids] start in that order, before the other queued
+  /// ones that come after them.
+  Future<void> reorder(List<String> ids) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.grabby.FetchrHostApi.reorder$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[ids],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
   Future<void> pause(String id) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.grabby.FetchrHostApi.pause$pigeonVar_messageChannelSuffix';
@@ -1288,6 +1316,65 @@ class FetchrHostApi {
       pigeonVar_channelName,
       isNullValid: true,
     );
+  }
+
+  Future<void> trackPlayer(int handle) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.grabby.FetchrHostApi.trackPlayer$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[handle],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
+  Future<void> untrackPlayer(int handle) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.grabby.FetchrHostApi.untrackPlayer$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[handle],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
+  Future<int> androidSdkInt() async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.grabby.FetchrHostApi.androidSdkInt$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
+    return pigeonVar_replyValue! as int;
   }
 
   Future<void> awaitLaunchSplash() async {

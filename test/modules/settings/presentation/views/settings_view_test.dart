@@ -545,7 +545,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Updating…').hitTestable(), findsOneWidget);
-      expect(find.text('Update yt-dlp'), findsNothing);
+      expect(find.text('Update yt-dlp').hitTestable(), findsNothing);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.text('Downloading the latest release…'), findsOneWidget);
       expect(find.text('Up to date'), findsNothing);

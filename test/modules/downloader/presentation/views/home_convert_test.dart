@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:grabby/app/routes/app_routes.dart';
+import 'package:grabby/app/shared/platform_traits_provider.dart';
 import 'package:grabby/core/errors/failure.dart';
 import 'package:grabby/core/errors/result.dart';
 import 'package:mocktail/mocktail.dart';
@@ -21,6 +22,16 @@ void main() {
 
     expect(_tile, findsOneWidget);
     expect(find.text('Pick any video on your phone'), findsOneWidget);
+  });
+
+  testWidgets('iOS traits: offers any video on the device', (tester) async {
+    await pumpHome(
+      tester,
+      app: homeApp(),
+      overrides: [platformTraitsProvider.overrideWithValue(PlatformTraits.ios)],
+    );
+
+    expect(find.text('Pick any video on your device'), findsOneWidget);
   });
 
   testWidgets('a picked video is queued as an MP3 in the save folder', (

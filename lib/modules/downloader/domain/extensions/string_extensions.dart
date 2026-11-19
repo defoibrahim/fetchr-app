@@ -28,3 +28,29 @@ String _trimTrailing(String url) {
 
 bool _balanced(String s) =>
     '('.allMatches(s).length >= ')'.allMatches(s).length;
+
+extension PlaylistLink on String {
+  /// The video alone when this is a YouTube link to a video inside a playlist
+  /// (`watch?v=X&list=Y`, `youtu.be/X?list=Y`), which yt-dlp reads as the
+  /// whole playlist; null for any other link.
+  String? get videoWithoutPlaylist {
+    final uri = Uri.tryParse(this);
+    if (uri == null || (uri.queryParameters['list'] ?? '').isEmpty) {
+      return null;
+    }
+    final host = uri.host.toLowerCase();
+    if (host == 'youtu.be' || host == 'www.youtu.be') {
+      if (uri.pathSegments.firstOrNull?.isEmpty ?? true) return null;
+      return Uri(scheme: uri.scheme, host: uri.host, path: uri.path).toString();
+    }
+    final video = uri.queryParameters['v'] ?? '';
+    final youtube = host == 'youtube.com' || host.endsWith('.youtube.com');
+    if (!youtube || uri.path != '/watch' || video.isEmpty) return null;
+    return Uri(
+      scheme: uri.scheme,
+      host: uri.host,
+      path: uri.path,
+      queryParameters: {'v': video},
+    ).toString();
+  }
+}

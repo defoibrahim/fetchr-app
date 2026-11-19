@@ -1,5 +1,6 @@
 package com.defo.fetchr
 
+import android.os.Build
 import com.defo.fetchr.pigeon.DownloadRequest
 import com.defo.fetchr.pigeon.DownloadsSnapshot
 import com.defo.fetchr.pigeon.DownloadsStreamHandler
@@ -47,6 +48,8 @@ class HostApi(private val activity: MainActivity) : FetchrHostApi {
     override fun cancel(id: String) = mapErrors { FetchrApp.downloads.cancel(id) }
 
     override fun retry(id: String) = mapErrors { FetchrApp.downloads.retry(id) }
+
+    override fun reorder(ids: List<String>) = mapErrors { FetchrApp.downloads.reorder(ids) }
 
     override fun pause(id: String) = mapErrors { FetchrApp.downloads.pause(id) }
 
@@ -113,6 +116,12 @@ class HostApi(private val activity: MainActivity) : FetchrHostApi {
     }
 
     override fun setAccentColor(argb: Long) = mapErrors { NativePrefs.setAccent(activity.applicationContext, argb) }
+
+    override fun androidSdkInt(): Long = Build.VERSION.SDK_INT.toLong()
+
+    override fun trackPlayer(handle: Long) = MpvGuard.players.track(handle)
+
+    override fun untrackPlayer(handle: Long) = MpvGuard.players.untrack(handle)
 }
 
 class DownloadsStream : DownloadsStreamHandler() {

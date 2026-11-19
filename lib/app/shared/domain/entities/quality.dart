@@ -20,6 +20,21 @@ enum Quality {
     _ => 'Movies',
   };
 
-  /// Where a download of this quality lands: "Movies/Fetchr".
-  String savePath(String folder) => '$saveRoot/$folder';
+  /// Where a download of this quality lands: "Movies/Fetchr", or
+  /// "Movies/Fetchr/Road trip" for a video of that playlist.
+  String savePath(String folder, {String? playlist}) {
+    final sub = playlist == null ? '' : _playlistFolder(playlist);
+    return sub.isEmpty ? '$saveRoot/$folder' : '$saveRoot/$folder/$sub';
+  }
+}
+
+// Mirrors RequestBuilder.saveFolder on the native side, which names the folder.
+final _forbidden = RegExp(r'[\\/:*?"<>|\x00-\x1f\x7f-\x9f]');
+final _leading = RegExp(r'^[.\s]+');
+const _maxName = 150;
+
+String _playlistFolder(String title) {
+  final clean = title.replaceAll(_forbidden, '').replaceFirst(_leading, '');
+  return (clean.length > _maxName ? clean.substring(0, _maxName) : clean)
+      .trimRight();
 }

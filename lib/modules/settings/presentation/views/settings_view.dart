@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/shared/domain/entities/quality.dart';
 import '../../../../app/shared/download_prefs_provider.dart';
+import '../../../../app/shared/platform_traits_provider.dart';
 import '../../../../app/theme/accent_provider.dart';
 import '../../../../app/theme/theme_mode_provider.dart';
 import '../../../../core/gen/assets.gen.dart';
@@ -17,6 +18,7 @@ import '../../../../core/widgets/section_header.dart';
 import '../../../../core/widgets/segmented_pills.dart';
 import 'widgets/accent_swatches.dart';
 import 'widgets/folder_dialog.dart';
+import 'widgets/licences_row.dart';
 import 'widgets/settings_section.dart';
 import 'widgets/yt_dlp_card.dart';
 
@@ -56,6 +58,7 @@ class SettingsView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final prefs = ref.watch(downloadPrefsProvider);
     final prefsNotifier = ref.read(downloadPrefsProvider.notifier);
+    final traits = ref.watch(platformTraitsProvider);
     final gutter = context.gutter;
 
     return Scaffold(
@@ -93,13 +96,14 @@ class SettingsView extends ConsumerWidget {
                       folder: prefs.folder,
                       onTap: () => _editFolder(context, ref, prefs.folder),
                     ),
-                    SettingsSwitchRow(
-                      title: 'Faster downloads (aria2c)',
-                      subtitle: 'Splits large files into parallel parts',
-                      value: prefs.useAria2c,
-                      onChanged: (enabled) =>
-                          unawaited(prefsNotifier.setUseAria2c(enabled)),
-                    ),
+                    if (traits.supportsAria2c)
+                      SettingsSwitchRow(
+                        title: 'Faster downloads (aria2c)',
+                        subtitle: 'Splits large files into parallel parts',
+                        value: prefs.useAria2c,
+                        onChanged: (enabled) =>
+                            unawaited(prefsNotifier.setUseAria2c(enabled)),
+                      ),
                   ],
                 ),
                 SettingsSection(
@@ -128,6 +132,7 @@ class SettingsView extends ConsumerWidget {
                   ],
                 ),
                 const YtDlpCard(),
+                const SettingsSection(title: 'About', rows: [LicencesRow()]),
               ],
             ),
           ),

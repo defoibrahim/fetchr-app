@@ -253,6 +253,32 @@ void main() {
       expect(context.motion(d), Duration.zero);
     });
 
+    testWidgets('motionOf zeroes every duration under reduce motion', (
+      tester,
+    ) async {
+      final context = await pumpContext(tester);
+      expect(context.motionOf(Motion.swap), Motion.swap);
+
+      reduceMotion(tester);
+      await tester.pump();
+      final instant = context.motionOf(Motion.swap);
+      expect(instant.duration, Duration.zero);
+      expect(instant.reverseDuration, Duration.zero);
+      expect(instant.curve, Motion.swap.curve);
+      expect(context.motionOf(Motion.fade).reverseDuration, isNull);
+    });
+
+    test('motion tokens: Material 3 durations, exits shorter than entries', () {
+      expect(Motion.press, const Duration(milliseconds: 100));
+      expect(Motion.fast, const Duration(milliseconds: 150));
+      expect(Motion.base, const Duration(milliseconds: 200));
+      expect(Motion.medium, const Duration(milliseconds: 250));
+      expect(Motion.emphasis, const Duration(milliseconds: 300));
+      for (final spec in [Motion.swap, Motion.reveal]) {
+        expect(spec.reverseDuration, lessThan(spec.duration));
+      }
+    });
+
     testWidgets('windowClass follows the window width', (tester) async {
       final context = await pumpContext(tester);
 

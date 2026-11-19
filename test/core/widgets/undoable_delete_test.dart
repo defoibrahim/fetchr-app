@@ -9,6 +9,7 @@ import 'package:grabby/core/widgets/app_icon.dart';
 import 'package:grabby/core/widgets/app_snackbar.dart';
 import 'package:grabby/core/widgets/undoable_delete.dart';
 
+import '../../support/haptics.dart';
 import '../../support/snackbar.dart';
 import 'widget_harness.dart';
 
@@ -78,6 +79,19 @@ void main() {
     expect(find.text('File deleted'), findsOneWidget);
     expect(find.text('Undo'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('warns once the item is hidden; Undo clicks', (tester) async {
+    final calls = recordHaptics(tester);
+    await start(tester, () async => const Ok(true));
+    expect(calls, ['HapticFeedbackType.mediumImpact']);
+
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(calls, [
+      'HapticFeedbackType.mediumImpact',
+      'HapticFeedbackType.selectionClick',
+    ]);
   });
 
   testWidgets('Undo restores and never commits', (tester) async {

@@ -6,6 +6,7 @@ import 'package:grabby/core/theme/theme.dart';
 import 'package:grabby/core/utils/scale.dart';
 import 'package:grabby/core/widgets/segmented_pills.dart';
 
+import '../../support/haptics.dart';
 import 'widget_harness.dart';
 
 const qualities = [
@@ -86,6 +87,20 @@ void main() {
         await tester.tap(find.text('MP3'));
 
         expect(taps, ['720', 'mp3']);
+      });
+
+      testWidgets('a new pick clicks; the selected pill does not', (
+        tester,
+      ) async {
+        final calls = recordHaptics(tester);
+        await pumpPills(tester, theme);
+
+        await tester.tap(find.text('1080p'));
+        await tester.pump();
+        expect(calls, isEmpty);
+        await tester.tap(find.text('720p'));
+        await tester.pump();
+        expect(calls, ['HapticFeedbackType.selectionClick']);
       });
 
       testWidgets('the selected pill is a primary fill with onPrimary text', (

@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../../../app/shared/domain/entities/quality.dart';
+import '../../../../../app/shared/platform_traits_provider.dart';
 import '../../../../../core/gen/assets.gen.dart';
 import '../../../../../core/theme/app_spacing.dart';
 import '../../../../../core/theme/theme.dart';
 import '../../../../../core/utils/formatters.dart';
+import '../../../../../core/utils/haptics.dart';
 import '../../../../../core/utils/scale.dart';
 import '../../../../../core/widgets/app_button.dart';
 import '../../../../../core/widgets/app_progress_bar.dart';
@@ -126,9 +128,13 @@ class _FormatSheetState extends ConsumerState<FormatSheet> {
                 effect: _skeletonEffect(context),
                 child: _Details(
                   info: info ?? _placeholder,
+                  deviceWord: ref.watch(platformTraitsProvider).deviceWord,
                   selected: selected,
                   fetching: info == null,
-                  onSelect: (q) => setState(() => _picked = q),
+                  onSelect: (q) {
+                    if (q != selected) AppHaptics.select();
+                    setState(() => _picked = q);
+                  },
                 ),
               ),
             ),
@@ -149,7 +155,10 @@ class _FormatSheetState extends ConsumerState<FormatSheet> {
                   icon: Assets.icons.download,
                   onPressed: selected == null
                       ? null
-                      : () => Navigator.of(context).pop(selected),
+                      : () {
+                          AppHaptics.select();
+                          Navigator.of(context).pop(selected);
+                        },
                 ),
               ),
             ],
@@ -174,12 +183,14 @@ PaintingEffect _skeletonEffect(BuildContext context) {
 class _Details extends StatelessWidget {
   const _Details({
     required this.info,
+    required this.deviceWord,
     required this.selected,
     required this.onSelect,
     this.fetching = false,
   });
 
   final MediaInfo info;
+  final String deviceWord;
 
   /// Null while fetching: the skeleton picks nothing.
   final Quality? selected;
@@ -195,7 +206,7 @@ class _Details extends StatelessWidget {
     final options = info.options;
     final thumbnail = info.thumbnail;
     final duration = formatDuration(info.durationSec);
-    final meta = sourceLine(info.url, info.uploader);
+    final meta = sourceLine(info.url, info.uploader, deviceWord: deviceWord);
     final estimated = options.any(
       (o) => o.sizeBytes != null && o.sizeIsEstimate,
     );

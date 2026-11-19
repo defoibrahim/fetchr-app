@@ -7,19 +7,24 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/routes/app_routes.dart';
 import '../../../../app/shared/domain/entities/quality.dart';
 import '../../../../app/shared/download_prefs_provider.dart';
+import '../../../../app/shared/platform_traits_provider.dart';
 import '../../../../core/errors/failure_mapper.dart';
 import '../../../../core/gen/assets.gen.dart';
+import '../../../../core/theme/app_motion.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/theme_extensions.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/haptics.dart';
 import '../../../../core/utils/scale.dart';
 import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/app_fade_switcher.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/empty_view.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/loading_view.dart';
 import '../../../../core/widgets/section_header.dart';
 import '../../domain/entities/library_item.dart';
+import '../../domain/extensions/library_item_extensions.dart';
 import '../providers/library_notifier.dart';
 import 'widgets/delete_library_item.dart';
 import 'widgets/library_card.dart';
@@ -96,16 +101,33 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
               onChanged: (filter) => setState(() => _filter = filter),
             ),
             Expanded(
-              child: switch (library) {
-                AsyncData(:final value) => _content(value, folder),
-                // A retry reloads from the error state: keep showing loading,
-                // not the old error, until it lands.
-                AsyncError(:final error) when !library.isLoading => ErrorView(
-                  message: messageOf(error),
-                  onRetry: () => ref.invalidate(libraryNotifierProvider),
-                ),
-                _ => const LoadingView(),
-              },
+              // Loading, the grid and the error cross-fade by kind; a refresh
+              // keeps the kind and repaints in place.
+              child: AppFadeSwitcher(
+                child: switch (library) {
+                  AsyncData(:final value) => KeyedSubtree(
+                    key: const ValueKey('data'),
+                    // A new filter fades in a fresh grid from the top. Fade
+                    // only: scaling a whole grid costs too much.
+                    child: AppFadeSwitcher(
+                      spec: Motion.crossFade,
+                      scaleFrom: 1,
+                      child: KeyedSubtree(
+                        key: ValueKey(_filter),
+                        child: _content(value, folder),
+                      ),
+                    ),
+                  ),
+                  // A retry reloads from the error state: keep showing
+                  // loading, not the old error, until it lands.
+                  AsyncError(:final error) when !library.isLoading => ErrorView(
+                    key: const ValueKey('error'),
+                    message: messageOf(error),
+                    onRetry: () => ref.invalidate(libraryNotifierProvider),
+                  ),
+                  _ => const LoadingView(key: ValueKey('loading')),
+                },
+              ),
             ),
           ],
         ),
@@ -119,6 +141,16 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
     final shown = [
       for (final item in items)
         if (_filter.matches(item)) item,
+    ];
+    // A playlist is one tile, where its newest file would be.
+    final playlists = shown.byPlaylist;
+    final seen = <String>{};
+    final cells = <Object>[
+      for (final item in shown)
+        if (item.playlist == null)
+          item
+        else if (seen.add(item.playlist!))
+          item.playlist!,
     ];
     // The window decides, not the grid's width: beside the rail a 900 dp
     // window leaves the grid under 840.
@@ -158,8 +190,15 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
                       mainAxisSpacing: _rowGap.h,
                       mainAxisExtent: LibraryCard.heightFor(context, width),
                     ),
-                    itemCount: shown.length,
-                    itemBuilder: (_, index) => _card(shown[index]),
+                    itemCount: cells.length,
+                    itemBuilder: (_, index) => switch (cells[index]) {
+                      final LibraryItem item => _card(item),
+                      final String playlist => _playlistCard(
+                        playlist,
+                        playlists[playlist]!,
+                      ),
+                      _ => const SizedBox.shrink(),
+                    },
                   );
                 },
               ),
@@ -178,13 +217,26 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
     onDelete: () => unawaited(deleteLibraryItem(context, ref, item)),
   );
 
+  Widget _playlistCard(String name, List<LibraryItem> files) =>
+      LibraryPlaylistCard(
+        key: ValueKey('playlist-$name'),
+        name: name,
+        items: files,
+        onOpen: () =>
+            unawaited(context.push(AppRoutes.libraryPlaylistLocation(name))),
+        onOpenFolder: () => _openFolder(files.first),
+        onDelete: () =>
+            unawaited(deleteLibraryPlaylist(context, ref, name, files)),
+      );
+
   Widget _emptyLibrary(String folder) => EmptyView(
     illustration: Assets.icons.emptyLibrary,
     title: _Filter.all.emptyText,
     message:
         'Finished videos and audio are saved to '
         '${Quality.best.savePath(folder)} and ${Quality.mp3.savePath(folder)} '
-        'and show up here and in Gallery.',
+        'and show up here and in '
+        '${ref.watch(platformTraitsProvider).galleryWord}.',
     action: AppButton(
       label: 'Paste a link',
       size: AppButtonSize.medium,
@@ -280,7 +332,10 @@ class _Filters extends StatelessWidget {
             ChoiceChip(
               label: Text(filter.label),
               selected: filter == selected,
-              onSelected: (_) => onChanged(filter),
+              onSelected: (_) {
+                if (filter != selected) AppHaptics.select();
+                onChanged(filter);
+              },
             ),
         ],
       ),

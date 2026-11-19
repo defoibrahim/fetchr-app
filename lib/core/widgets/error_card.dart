@@ -15,7 +15,6 @@ const _bodyHeight = 1.45;
 const _actionsGap = 14.0;
 const _metaGap = 3.0;
 const _compactTextMin = 64.0;
-const _appear = Duration(milliseconds: 200);
 
 class ErrorCardAction {
   const ErrorCardAction({
@@ -66,32 +65,46 @@ class ErrorCard extends StatelessWidget {
     super.key,
     required this.data,
     this.layout = ErrorCardLayout.full,
+    this.onTap,
+    this.tapHint,
   });
 
   final ErrorCardData data;
   final ErrorCardLayout layout;
 
+  /// Makes the whole card a tap target with a ripple; its buttons still take
+  /// their own taps.
+  final VoidCallback? onTap;
+
+  /// What a tap does, for a screen reader ("Show error details").
+  final String? tapHint;
+
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     final full = layout == ErrorCardLayout.full;
-    final card = DecoratedBox(
-      decoration: BoxDecoration(
-        color: tokens.errorSurface,
-        border: Border.all(color: tokens.errorBorder),
-        borderRadius: BorderRadius.circular(Radii.card.r),
+    final body = Padding(
+      padding: EdgeInsets.all((full ? _fullPadding : _compactPadding).r),
+      child: full ? _full(context) : _compact(context),
+    );
+    final radius = BorderRadius.circular(Radii.card.r);
+    final tap = onTap;
+    // A Material, not a DecoratedBox, so the ripple paints on the card's fill
+    // instead of under it.
+    final card = Material(
+      color: tokens.errorSurface,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: tokens.errorBorder),
+        borderRadius: radius,
       ),
-      child: Padding(
-        padding: EdgeInsets.all((full ? _fullPadding : _compactPadding).r),
-        child: full ? _full(context) : _compact(context),
-      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(onTap: tap, child: body),
     );
     return Semantics(
       liveRegion: true,
       container: true,
-      // A compact row lives in a lazy list: replaying the entrance on every
-      // scroll-in would make the list flicker.
-      child: full ? _Appear(child: card) : card,
+      onTapHint: tap == null ? null : tapHint,
+      child: card,
     );
   }
 
@@ -221,34 +234,6 @@ class ErrorCard extends StatelessWidget {
             child: _button(action, AppButtonSize.small, expanded: false),
           ),
       ],
-    );
-  }
-}
-
-/// Fades in and grows from nothing, once, when the card first appears.
-class _Appear extends StatelessWidget {
-  const _Appear({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    if (context.reduceMotion) return child;
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: _appear,
-      curve: Curves.easeOut,
-      child: child,
-      builder: (_, t, child) => Opacity(
-        opacity: t,
-        child: ClipRect(
-          child: Align(
-            alignment: Alignment.topCenter,
-            heightFactor: t,
-            child: child,
-          ),
-        ),
-      ),
     );
   }
 }

@@ -1,9 +1,11 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:grabby/app/routes/app_routes.dart';
 import 'package:grabby/core/errors/error_messages.dart';
 import 'package:grabby/core/errors/failure.dart';
 import 'package:grabby/core/errors/result.dart';
+import 'package:grabby/core/widgets/app_pressable.dart';
 import 'package:grabby/core/widgets/media_thumb.dart';
 import 'package:grabby/modules/library/presentation/views/widgets/library_card.dart';
 import 'package:mocktail/mocktail.dart';
@@ -122,6 +124,48 @@ void main() {
       expect(find.byType(MenuItemButton), findsNWidgets(4));
       expect(find.byType(Dialog), findsNothing);
       expect(pushed, isEmpty);
+    });
+
+    testWidgets('a tap on the title plays it too: the tile is one target', (
+      tester,
+    ) async {
+      stubList(() async => Ok(bothItems));
+      await pumpLibrary(tester);
+
+      await tester.tap(find.text(clipItem.name));
+      await tester.pumpAndSettle();
+
+      expect(pushed.single.path, AppRoutes.player);
+    });
+
+    testWidgets('a held tile shrinks to 0.98, ripples over its picture', (
+      tester,
+    ) async {
+      stubList(() async => Ok(bothItems));
+      await pumpLibrary(tester);
+      final card = find.byType(LibraryCard).first;
+      final pressable = tester.widget<AppPressable>(
+        find.descendant(of: card, matching: find.byType(AppPressable)),
+      );
+      expect(pressable.pressedScale, .98);
+      expect(pressable.inkAbove, isTrue);
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(
+          find.descendant(of: card, matching: find.byType(MediaThumb)),
+        ),
+      );
+      await tester.pump(kPressTimeout);
+      expect(
+        tester
+            .widget<AnimatedScale>(
+              find.descendant(of: card, matching: find.byType(AnimatedScale)),
+            )
+            .scale,
+        .98,
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
     });
 
     testWidgets('the dots open Play, Share, Show in folder and Delete file', (

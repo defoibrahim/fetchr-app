@@ -13,7 +13,6 @@ const _radioSize = 18.0;
 const _borderWidth = 1.5;
 const _padX = 14.0;
 const _padY = 4.0;
-const _fade = Duration(milliseconds: 150);
 
 /// One quality row of the format sheet. The whole row is the tap target, so
 /// the radio only draws the state.
@@ -59,7 +58,7 @@ class QualityOption extends StatelessWidget {
             width: _borderWidth,
           ),
         ),
-        animationDuration: context.motion(_fade),
+        animationDuration: context.motion(Motion.fast),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,

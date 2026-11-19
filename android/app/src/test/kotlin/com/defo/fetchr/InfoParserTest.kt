@@ -131,24 +131,29 @@ class InfoParserTest {
         assertNull(info.durationSeconds)
         assertTrue(info.thumbnail!!.endsWith("rs=AOn4CLC_2pbn1Z9xFNrPS46CiimPR3-zRA"))
         assertEquals(bare(*tiers.toTypedArray()), info.options)
-        assertEquals(5, info.entries.size)
+        assertEquals(3, info.entries.size)
 
         val first = info.entries[0]
         assertEquals("https://www.youtube.com/watch?v=KIViy7L_lo8", first.url)
         assertEquals("2016 — Year in Search", first.title)
         assertEquals(121L, first.durationSeconds)
         assertTrue("last thumbnail wins", first.thumbnail!!.endsWith("rs=AOn4CLABzVEqTkQPeGIcYHNPL7D31C1p-g"))
-        assertEquals("El año en búsquedas 2014", info.entries[3].title)
+        assertEquals("El año en búsquedas 2014", info.entries[2].title)
     }
 
     @Test
-    fun playlistEntryWithNullTitleAndDurationKeepsUrlAsTitle() {
-        val entry = InfoParser.parse(fixture("playlist.json"), url).entries[2]
+    fun youTubePlaceholderTitlesAreDroppedButOnlyForYouTube() {
+        val json = """{"_type":"playlist","entries":[
+            {"ie_key":"Youtube","url":"https://a.test/p","title":"[Private video]"},
+            {"ie_key":"Youtube","url":"https://a.test/d","title":"[Deleted video]"},
+            {"ie_key":"Youtube","url":"https://a.test/n","title":null},
+            {"ie_key":"Youtube","url":"https://a.test/ok","title":"Fine"},
+            {"ie_key":"Vimeo","url":"https://a.test/v","title":null}]}"""
 
-        assertEquals("https://www.youtube.com/watch?v=mt7rGhAm2CY", entry.url)
-        assertEquals(entry.url, entry.title)
-        assertNull(entry.durationSeconds)
-        assertTrue(entry.thumbnail!!.startsWith("https://i.ytimg.com/vi/mt7rGhAm2CY/"))
+        assertEquals(
+            listOf("https://a.test/ok", "https://a.test/v"),
+            InfoParser.parse(json, url).entries.map { it.url },
+        )
     }
 
     @Test

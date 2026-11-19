@@ -9,6 +9,7 @@ import 'package:media_kit/media_kit.dart';
 import '../../../../app/routes/app_routes.dart';
 import '../../../../app/shared/saved_source_provider.dart';
 import '../../../../core/logging/app_logger.dart';
+import '../../../../core/theme/app_motion.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/theme_extensions.dart';
 import '../../../../core/utils/scale.dart';
@@ -43,15 +44,24 @@ class PlayerView extends ConsumerStatefulWidget {
 class _PlayerViewState extends ConsumerState<PlayerView> {
   late final Player _player;
   late final StreamSubscription<String> _errors;
+  late final AppLifecycleListener _lifecycle;
   final _videoKey = GlobalKey();
   VideoSurfaceBuilder? _video;
   bool _reported = false;
+
+  // What the page last showed, kept once it starts leaving: the delete that
+  // follows hides the item while the route still fades out, and the page must
+  // not turn into a black box (or bind a video controller to an audio file)
+  // under the user's eyes.
+  LibraryItem? _shown;
+  bool _leaving = false;
 
   @override
   void initState() {
     super.initState();
     _player = ref.read(playerFactoryProvider)();
     _errors = _player.stream.error.listen(_onError);
+    _lifecycle = AppLifecycleListener(onHide: _pauseVideo);
     unawaited(
       _player.open(Media(widget.uri)).catchError((Object e, StackTrace s) {
         _onError('$e');
@@ -61,9 +71,23 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     unawaited(_errors.cancel());
     unawaited(_player.dispose());
     super.dispose();
+  }
+
+  // Nobody sees a video in the background, and libmpv drawing into a surface
+  // whose Activity Android then destroys crashed the app. Audio keeps playing.
+  // A file the Library does not list (another folder, or still loading) is
+  // judged by what mpv found in it; cover art does not make a song a video.
+  void _pauseVideo() {
+    final isAudio =
+        ref.read(libraryItemProvider(widget.uri))?.isAudio ??
+        !_player.state.tracks.video.any(
+          (t) => t.id != 'auto' && t.id != 'no' && t.albumart != true,
+        );
+    if (!isAudio) unawaited(_player.pause());
   }
 
   // mpv logs decoder errors that do not stop playback, so the video stays up
@@ -83,7 +107,10 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
   Widget _surface(BuildContext context, {required bool isAudio}) {
     if (isAudio) return const AudioTile(iconSize: _audioIconSize);
     final video = _video ??= ref.read(videoSurfaceFactoryProvider)(_player);
-    return ColoredBox(color: _backdrop, child: video(context));
+    return ColoredBox(
+      color: _backdrop,
+      child: _FirstFrameFade(player: _player, child: video(context)),
+    );
   }
 
   // Restored in finally: the route can end by the system back button too.
@@ -125,6 +152,7 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
   // With nothing under the player (a deep link), the Library is the place a
   // deleted file leaves you.
   void _leave() {
+    _leaving = true;
     if (context.canPop()) {
       context.pop();
     } else {
@@ -134,7 +162,8 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
 
   @override
   Widget build(BuildContext context) {
-    final item = ref.watch(libraryItemProvider(widget.uri));
+    final watched = ref.watch(libraryItemProvider(widget.uri));
+    final item = _leaving ? _shown : (_shown = watched);
     // The key moves the picture between the stacked and split layouts without
     // rebuilding its Element, so a rotation keeps the overlay and the texture.
     final video = KeyedSubtree(
@@ -208,4 +237,48 @@ class _BackRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Fades [child] in over the black backdrop once the player knows the video's
+/// size, which it learns with the first frame; the surface would otherwise pop
+/// in. A player that already has a frame (the fullscreen route) shows at once.
+class _FirstFrameFade extends StatefulWidget {
+  const _FirstFrameFade({required this.player, required this.child});
+
+  final Player player;
+  final Widget child;
+
+  @override
+  State<_FirstFrameFade> createState() => _FirstFrameFadeState();
+}
+
+class _FirstFrameFadeState extends State<_FirstFrameFade> {
+  late bool _hasFrame = widget.player.state.width != null;
+  StreamSubscription<int?>? _width;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_hasFrame) return;
+    _width = widget.player.stream.width.listen((width) {
+      if (width == null || !mounted) return;
+      unawaited(_width?.cancel());
+      _width = null;
+      setState(() => _hasFrame = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    unawaited(_width?.cancel());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedOpacity(
+    opacity: _hasFrame ? 1 : 0,
+    duration: context.motion(Motion.base),
+    curve: Motion.enter,
+    child: widget.child,
+  );
 }

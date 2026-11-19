@@ -13,6 +13,7 @@ import java.io.File
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
@@ -31,8 +32,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 class DownloadRepository(context: Context) {
@@ -50,12 +49,13 @@ class DownloadRepository(context: Context) {
 
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val permits = Semaphore(MAX_PARALLEL)
+    private val queue = StartQueue(MAX_PARALLEL)
     private val jobs = ConcurrentHashMap<String, Job>()
 
     // Orders status changes against job hand-over, so a retried task is never overwritten by the attempt it replaces.
     private val lock = Any()
     private val persistLock = Any()
+    private val persistQueued = AtomicBoolean(false)
     private val store = AtomicFile(File(appContext.filesDir, "downloads.json"))
     private val state = MutableStateFlow(load())
 
@@ -122,6 +122,16 @@ class DownloadRepository(context: Context) {
 
     fun retry(id: String) = relaunch(id, TaskTransitions::retry)
 
+    // The queued tasks of [ids] start in that order, and the list shows them so: they swap the places they hold.
+    fun reorder(ids: List<String>) {
+        synchronized(lock) {
+            queue.reorder(ids)
+            state.update { list ->
+                list.toMutableList().apply { swapSlots(ids, DownloadTask::id) { it.status == TaskStatus.QUEUED } }
+            }
+        }
+    }
+
     // Only a completed task owns a saved file; a retried one has cleared its uri.
     fun savedUri(id: String): String? =
         state.value.firstOrNull { it.id == id && it.status == TaskStatus.COMPLETED }?.savedUri
@@ -144,17 +154,23 @@ class DownloadRepository(context: Context) {
         startService()
     }
 
-    private fun launchRun(id: String) = chain(id) { runTask(id) }
+    private fun launchRun(id: String) {
+        val ticket = queue.add(id)
+        chain(id, onDone = { queue.drop(ticket) }) { runTask(id, ticket) }
+    }
 
     // Work on a task queues behind the attempt it replaces, which may still be unwinding in the same temp dir.
-    private fun chain(id: String, block: suspend () -> Unit) {
+    private fun chain(id: String, onDone: () -> Unit = {}, block: suspend () -> Unit) {
         val previous = jobs[id]
         val job = scope.launch(start = CoroutineStart.LAZY) {
             previous?.join()
             block()
         }
         jobs[id] = job
-        job.invokeOnCompletion { jobs.remove(id, job) }
+        job.invokeOnCompletion {
+            jobs.remove(id, job)
+            onDone()
+        }
         job.start()
     }
 
@@ -162,14 +178,14 @@ class DownloadRepository(context: Context) {
 
     private fun statusOf(id: String): TaskStatus? = state.value.firstOrNull { it.id == id }?.status
 
-    private suspend fun runTask(id: String) {
+    private suspend fun runTask(id: String, ticket: StartQueue.Ticket) {
         tempCleanup.join()
         val self = currentCoroutineContext()[Job]
         val dir = dirOf(id)
         try {
-            permits.withPermit {
+            queue.withTurn(ticket) {
                 // Not persisted: a restart loads queued and running tasks alike as interrupted.
-                val running = transition(id, self, TaskTransitions::start) ?: return
+                val running = transition(id, self, TaskTransitions::start) ?: return@withTurn
                 val file = download(id, running.request, dir, self)
                 // The file is whole: a pause or resume landing now must not leave it unsaved in the temp dir, or
                 // the next attempt would find it, save it again and add a second copy to the library.
@@ -198,8 +214,11 @@ class DownloadRepository(context: Context) {
 
     private suspend fun complete(id: String, req: DownloadRequest, file: File) {
         val bytes = file.length()
-        val uri = MediaLibrary.save(appContext, file, req.quality.mediaKind, req.folder)
-        settle(id) { TaskTransitions.complete(it, uri, bytes, System.currentTimeMillis()) }
+        val kind = req.quality.mediaKind
+        val folder = RequestBuilder.saveFolder(req)
+        val uri = MediaLibrary.save(appContext, file, kind, folder)
+        val path = "${MediaLibrary.rootDir(kind)}/$folder"
+        settle(id) { TaskTransitions.complete(it, uri, path, bytes, System.currentTimeMillis()) }
     }
 
     private suspend fun download(id: String, req: DownloadRequest, dir: File, self: Job?): File {
@@ -329,8 +348,14 @@ class DownloadRepository(context: Context) {
             .getOrDefault(emptyList())
             .sortedByDescending { it.createdAtMs }
 
+    // A write reads the list when it runs, so the changes made while one waits need no write of their own: a
+    // playlist paused or removed task by task saves a few times, not once per video.
     private fun persistAsync() {
-        scope.launch { persist() }
+        if (!persistQueued.compareAndSet(false, true)) return
+        scope.launch {
+            persistQueued.set(false)
+            persist()
+        }
     }
 
     private fun persist() {

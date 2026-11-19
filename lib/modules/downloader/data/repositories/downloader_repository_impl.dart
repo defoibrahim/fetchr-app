@@ -43,6 +43,10 @@ class DownloaderRepositoryImpl implements IDownloaderRepository {
   Future<Result<void>> retry(String id) => guard(() => _api.retry(id));
 
   @override
+  Future<Result<void>> reorder(List<String> ids) =>
+      guard(() => _api.reorder(ids));
+
+  @override
   Future<Result<void>> pause(String id) => guard(() => _api.pause(id));
 
   @override
@@ -181,6 +185,7 @@ DownloadTask _toTask(api.DownloadTask task) {
         ? task.errorMessage
         : null,
     savedUri: task.savedUri,
+    savedPath: task.savedPath,
     createdAt: DateTime.fromMillisecondsSinceEpoch(task.createdAtMs),
     stage: _toStage(task.stage),
     downloadedBytes: task.downloadedBytes,

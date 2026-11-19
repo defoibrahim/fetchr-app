@@ -6,6 +6,14 @@ abstract final class AppRoutes {
   static const player = '/player';
   static const playlist = '/playlist';
   static const gallery = '/gallery';
+  static const libraryPlaylist = '/library-playlist';
+  static const downloadsPlaylist = '/downloads/playlist/:id';
+
+  static String libraryPlaylistLocation(String name) =>
+      Uri(path: libraryPlaylist, queryParameters: {'name': name}).toString();
+
+  static String downloadsPlaylistLocation(String id) =>
+      '/downloads/playlist/${Uri.encodeComponent(id)}';
 
   static String playerLocation({required String uri, required String title}) =>
       Uri(

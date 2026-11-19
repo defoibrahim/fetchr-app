@@ -24,3 +24,30 @@ class AppBackButton extends StatelessWidget {
     );
   }
 }
+
+/// The back arrow and the name of where it leads, at the top of a screen
+/// with no app bar.
+class AppBackHeader extends StatelessWidget {
+  const AppBackHeader(this.label, {super.key});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(Gap.sm.w, Gap.sm.h, context.gutter, Gap.xs.h),
+    child: Row(
+      spacing: Gap.xs.w,
+      children: [
+        const AppBackButton(),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.type.button,
+          ),
+        ),
+      ],
+    ),
+  );
+}

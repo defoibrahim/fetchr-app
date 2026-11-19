@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../utils/scale.dart';
+import 'app_motion.dart';
 import 'app_spacing.dart';
 import 'app_text_styles.dart';
 import 'app_tokens.dart';
@@ -25,4 +26,7 @@ extension ThemeContextX on BuildContext {
 
   /// `d`, or zero when the user asked for less motion.
   Duration motion(Duration d) => reduceMotion ? Duration.zero : d;
+
+  /// `spec`, with every duration at zero when the user asked for less motion.
+  MotionSpec motionOf(MotionSpec spec) => reduceMotion ? spec.instant : spec;
 }

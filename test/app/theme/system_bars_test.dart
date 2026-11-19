@@ -41,6 +41,22 @@ void main() {
       expect(style.systemNavigationBarIconBrightness, Brightness.dark);
     });
 
+    testWidgets('iOS reads the bar behind the icons: dark under light icons', (
+      tester,
+    ) async {
+      await pumpThemed(tester, const SystemBars(child: Text('page')));
+      expect(_style(tester).statusBarBrightness, Brightness.dark);
+
+      await pumpThemed(
+        tester,
+        const SystemBars(child: Text('page')),
+        brightness: Brightness.light,
+      );
+      await tester.pumpAndSettle();
+
+      expect(_style(tester).statusBarBrightness, Brightness.light);
+    });
+
     testWidgets('lets the bars show their own colour, not a system scrim', (
       tester,
     ) async {

@@ -1,7 +1,7 @@
 name: grabby
 description: Android video and audio downloader built on yt-dlp.
 publish_to: none
-version: 1.1.5+7
+version: 1.1.6+8
 
 environment:
   sdk: ^3.11.0
@@ -65,6 +65,7 @@ flutter:
     - assets/fonts/Bricolage/OFL.txt
     - assets/fonts/Geist/OFL.txt
     - assets/fonts/JetBrainsMono/OFL.txt
+    - assets/licenses/ios/
   fonts:
     - family: Bricolage
       fonts:

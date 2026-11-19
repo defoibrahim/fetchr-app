@@ -124,14 +124,31 @@ void main() {
   group('sourceLine', () {
     test('joins the site and the uploader', () {
       expect(
-        sourceLine('https://www.youtube.com/watch?v=1', 'Open Road'),
+        sourceLine(
+          'https://www.youtube.com/watch?v=1',
+          'Open Road',
+          deviceWord: 'phone',
+        ),
         'youtube.com · Open Road',
       );
     });
 
     test('is the site alone for a missing or blank uploader', () {
-      expect(sourceLine('https://vimeo.com/1', null), 'vimeo.com');
-      expect(sourceLine('https://vimeo.com/1', '  '), 'vimeo.com');
+      expect(
+        sourceLine('https://vimeo.com/1', null, deviceWord: 'phone'),
+        'vimeo.com',
+      );
+      expect(
+        sourceLine('https://vimeo.com/1', '  ', deviceWord: 'phone'),
+        'vimeo.com',
+      );
+    });
+
+    test('a converted video names the device', () {
+      expect(
+        sourceLine('file:///picked/a.mp4', null, deviceWord: 'device'),
+        'This device',
+      );
     });
   });
 
@@ -155,19 +172,32 @@ void main() {
 
     for (final MapEntry(key: url, value: expected) in cases.entries) {
       test('$url is $expected', () {
-        expect(siteOf(url), expected);
+        expect(siteOf(url, deviceWord: 'phone'), expected);
       });
     }
 
-    test('a video converted from the device is This phone', () {
-      expect(siteOf('content://media/picker/0/x/media/7'), 'This phone');
-      expect(siteOf('file:///storage/emulated/0/Movies/a.mp4'), 'This phone');
+    test('a video converted from the device is This <device>', () {
+      expect(
+        siteOf('content://media/picker/0/x/media/7', deviceWord: 'phone'),
+        'This phone',
+      );
+      expect(
+        siteOf('file:///storage/emulated/0/Movies/a.mp4', deviceWord: 'phone'),
+        'This phone',
+      );
+      expect(
+        siteOf('file:///var/mobile/picked/a/a.mp4', deviceWord: 'device'),
+        'This device',
+      );
     });
 
     test('a URL with no host gives the input', () {
-      expect(siteOf('not a url'), 'not a url');
-      expect(siteOf('youtube.com/watch'), 'youtube.com/watch');
-      expect(siteOf(''), '');
+      expect(siteOf('not a url', deviceWord: 'phone'), 'not a url');
+      expect(
+        siteOf('youtube.com/watch', deviceWord: 'phone'),
+        'youtube.com/watch',
+      );
+      expect(siteOf('', deviceWord: 'phone'), '');
     });
   });
 
