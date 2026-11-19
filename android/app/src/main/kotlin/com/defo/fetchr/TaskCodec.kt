@@ -35,6 +35,7 @@ object TaskCodec {
         .put("errorCode", t.errorCode)
         .put("errorMessage", t.errorMessage)
         .put("savedUri", t.savedUri)
+        .put("savedPath", t.savedPath)
         .put("createdAtMs", t.createdAtMs)
         .put("stage", t.stage.name)
         .put("downloadedBytes", t.downloadedBytes)
@@ -65,6 +66,7 @@ object TaskCodec {
             errorCode = o.str("errorCode"),
             errorMessage = o.str("errorMessage"),
             savedUri = o.str("savedUri"),
+            savedPath = o.str("savedPath"),
             createdAtMs = o.getLong("createdAtMs"),
             stage = o.str("stage")?.let(TaskStage::valueOf) ?: TaskStage.PREPARING,
             downloadedBytes = o.long("downloadedBytes"),

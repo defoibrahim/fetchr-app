@@ -20,6 +20,7 @@ import 'package:grabby/modules/downloader/presentation/views/widgets/playlist_ro
 import '../../../../core/widgets/widget_harness.dart';
 import '../../../../support/app_fonts.dart';
 import '../../../../support/fixtures.dart';
+import '../../../../support/haptics.dart';
 import '../../../../support/mocks.dart';
 
 typedef _Download =
@@ -391,14 +392,19 @@ void main() {
         tester,
       ).open(_playlist(), prefs: const DownloadPrefs(folder: 'Trips'));
 
-      expect(find.text('Saves to Movies/Trips'), findsOneWidget);
+      expect(
+        find.text('Saves to Movies/Trips/Coastal road trips'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('forces the save path to read left to right', (tester) async {
       await _Page(tester).open(_playlist());
 
       expect(
-        tester.widget<Text>(find.text('Saves to Movies/Fetchr')).textDirection,
+        tester
+            .widget<Text>(find.textContaining('Saves to Movies/Fetchr'))
+            .textDirection,
         TextDirection.ltr,
       );
     });
@@ -409,7 +415,10 @@ void main() {
 
       await page.tapText('MP3');
 
-      expect(find.text('Saves to Music/Trips'), findsOneWidget);
+      expect(
+        find.text('Saves to Music/Trips/Coastal road trips'),
+        findsOneWidget,
+      );
     });
 
     for (final MapEntry(key: mode, value: theme) in themes.entries) {
@@ -422,7 +431,7 @@ void main() {
         final bar = tester.widget<DecoratedBox>(
           find
               .ancestor(
-                of: find.text('Saves to Movies/Fetchr'),
+                of: find.textContaining('Saves to Movies/Fetchr'),
                 matching: find.byType(DecoratedBox),
               )
               .first,
@@ -478,6 +487,14 @@ void main() {
       expect(page.closed, isTrue);
       expect(page.popped, 2);
       expect(find.byType(PlaylistView), findsNothing);
+    });
+
+    testWidgets('an Ok plays the confirm haptic', (tester) async {
+      final calls = recordHaptics(tester);
+      final page = _Page(tester);
+      await page.open(_playlist());
+      await page.tapText('Download 24 videos');
+      expect(calls, ['HapticFeedbackType.successNotification']);
     });
 
     testWidgets('an Err shows the failure and stays on the page', (

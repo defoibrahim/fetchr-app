@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../errors/result.dart';
+import '../utils/haptics.dart';
 import 'app_snackbar.dart';
 
 /// Hides the item at once, offers Undo for five seconds and commits the delete
@@ -20,6 +21,7 @@ Future<void> runUndoableDelete(
 }) async {
   final navigator = Navigator.of(context, rootNavigator: true);
   hide();
+  AppHaptics.warn();
   if (await AppSnackbar.showUndo(navigator.context, message)) {
     restore();
     return;

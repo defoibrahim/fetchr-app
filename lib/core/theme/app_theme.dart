@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'app_button_themes.dart';
+import 'app_page_transitions.dart';
 import 'app_palette.dart';
 import 'app_spacing.dart';
 import 'app_text_styles.dart';
@@ -83,6 +84,7 @@ abstract final class AppTheme {
       scaffoldBackgroundColor: tokens.bg,
       textTheme: AppTypography.textTheme(scheme),
       extensions: [tokens, type],
+      pageTransitionsTheme: AppPageTransitions.theme,
       appBarTheme: AppBarTheme(
         backgroundColor: tokens.bg,
         foregroundColor: tokens.text,

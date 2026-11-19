@@ -140,6 +140,124 @@ void main() {
         expect(fillFactor(tester), closeTo(.8, .001));
       });
 
+      Duration tweenOf(WidgetTester tester) => tester
+          .widget<TweenAnimationBuilder<double>>(
+            find.byType(TweenAnimationBuilder<double>),
+          )
+          .duration;
+
+      Future<void> update(
+        WidgetTester tester,
+        double value,
+        Duration gap,
+      ) async {
+        await tester.pump(gap);
+        await pumpBar(tester, theme, AppProgressBar(value: value));
+      }
+
+      testWidgets('the tween lasts as long as the gap between updates', (
+        tester,
+      ) async {
+        await pumpBar(tester, theme, const AppProgressBar(value: .1));
+        // No gap to go by yet.
+        await update(tester, .2, const Duration(milliseconds: 600));
+        expect(tweenOf(tester), AppProgressBar.firstTween);
+
+        // Native, every 250 ms.
+        await update(tester, .3, const Duration(milliseconds: 250));
+        expect(tweenOf(tester), const Duration(milliseconds: 250));
+
+        // aria2c, every second: one long glide, no jump and rest.
+        await update(tester, .4, const Duration(seconds: 1));
+        expect(tweenOf(tester), const Duration(seconds: 1));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(fillFactor(tester), closeTo(.35, .005));
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(fillFactor(tester), closeTo(.4, .001));
+      });
+
+      testWidgets('the gap is clamped to 150 to 1200 ms', (tester) async {
+        await pumpBar(tester, theme, const AppProgressBar(value: .1));
+        await update(tester, .2, const Duration(milliseconds: 250));
+        await update(tester, .3, const Duration(seconds: 5));
+        expect(tweenOf(tester), AppProgressBar.maxTween);
+        await update(tester, .4, const Duration(milliseconds: 20));
+        expect(tweenOf(tester), AppProgressBar.minTween);
+        await tester.pumpAndSettle();
+      });
+
+      testWidgets('the same value again is no update', (tester) async {
+        await pumpBar(tester, theme, const AppProgressBar(value: .1));
+        await update(tester, .2, const Duration(milliseconds: 250));
+        await update(tester, .2, const Duration(milliseconds: 100));
+        await update(tester, .3, const Duration(milliseconds: 150));
+        expect(tweenOf(tester), const Duration(milliseconds: 250));
+        await tester.pumpAndSettle();
+      });
+
+      testWidgets('sliding cross-fades into the fill over 200 ms', (
+        tester,
+      ) async {
+        await pumpBar(tester, theme, const AppProgressBar());
+        await pumpBar(tester, theme, const AppProgressBar(value: .3));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(find.byType(FractionallySizedBox), findsNWidgets(2));
+        await tester.pump(const Duration(milliseconds: 101));
+        await tester.pump();
+        expect(find.byType(FractionallySizedBox), findsOneWidget);
+        expect(fillFactor(tester), closeTo(.3, .001));
+      });
+
+      testWidgets('the paused colour eases in over 150 ms', (tester) async {
+        await pumpBar(tester, theme, const AppProgressBar(value: .5));
+        await pumpBar(
+          tester,
+          theme,
+          AppProgressBar(value: .5, color: tokens.textMuted),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 75));
+        expect(fillColor(tester), isNot(scheme.primary));
+        expect(fillColor(tester), isNot(tokens.textMuted));
+        await tester.pump(const Duration(milliseconds: 75));
+        expect(fillColor(tester), tokens.textMuted);
+      });
+
+      testWidgets('the fill paints in a layer of its own', (tester) async {
+        await pumpBar(tester, theme, const AppProgressBar(value: .5));
+        expect(
+          find.ancestor(
+            of: find.byType(ClipRRect),
+            matching: find.byType(RepaintBoundary),
+          ),
+          findsWidgets,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(AppProgressBar),
+            matching: find.byType(RepaintBoundary),
+          ),
+          findsWidgets,
+        );
+      });
+
+      testWidgets('reduce motion: the colour and the swap are instant', (
+        tester,
+      ) async {
+        reduceMotion(tester);
+        await pumpBar(tester, theme, const AppProgressBar());
+        await pumpBar(
+          tester,
+          theme,
+          AppProgressBar(value: .5, color: tokens.textMuted),
+        );
+        await tester.pump();
+        expect(find.byType(FractionallySizedBox), findsOneWidget);
+        expect(fillColor(tester), tokens.textMuted);
+      });
+
       testWidgets('reduce motion jumps straight to the value', (tester) async {
         reduceMotion(tester);
         await pumpBar(tester, theme, const AppProgressBar(value: .2));

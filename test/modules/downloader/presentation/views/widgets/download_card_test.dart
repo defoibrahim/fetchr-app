@@ -148,7 +148,7 @@ void main() {
             ),
           );
 
-          expect(find.text('720p · 3 of 18 in playlist'), findsOneWidget);
+          expect(find.text('720p · 3 of 18'), findsOneWidget);
         });
 
         testWidgets('an audio download has the audio tile', (tester) async {

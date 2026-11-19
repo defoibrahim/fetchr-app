@@ -2,13 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:grabby/app/launch/launch_intro.dart';
 import 'package:grabby/app/routes/app_routes.dart';
 import 'package:grabby/app/shared/domain/entities/quality.dart';
 import 'package:grabby/app/shared/domain/entities/yt_dlp_status.dart';
+import 'package:grabby/app/shared/platform_traits_provider.dart';
+import 'package:grabby/app/shell/app_branch_switcher.dart';
 import 'package:grabby/core/errors/error_messages.dart';
 import 'package:grabby/core/errors/failure.dart';
 import 'package:grabby/core/errors/result.dart';
 import 'package:grabby/core/utils/formatters.dart';
+import 'package:grabby/core/widgets/app_reveal.dart';
+import 'package:grabby/core/widgets/error_card.dart';
 import 'package:grabby/modules/downloader/domain/entities/download_request.dart';
 import 'package:grabby/modules/downloader/domain/entities/format_option.dart';
 import 'package:grabby/modules/downloader/domain/entities/media_info.dart';
@@ -19,6 +24,7 @@ import 'package:mocktail/mocktail.dart';
 import '../../../../core/widgets/widget_harness.dart';
 import '../../../../support/fake_app.dart';
 import '../../../../support/fixtures.dart';
+import '../../../../support/haptics.dart';
 import 'home_view_support.dart';
 
 void main() {
@@ -117,6 +123,19 @@ void main() {
       expect(fieldBorder(tester).top.width, 1);
     });
 
+    testWidgets('the card folds away instead of vanishing', (tester) async {
+      await openSheet(tester, app, answer: const Err(PrivateVideoFailure()));
+      final card = find.byType(ErrorCard);
+      final full = tester.getSize(card).height;
+
+      await typeUrl(tester, '${clipUrl}x');
+      await tester.pump(const Duration(milliseconds: 100));
+      final reveal = find.ancestor(of: card, matching: find.byType(AppReveal));
+      expect(tester.getSize(reveal.first).height, inExclusiveRange(0, full));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(card, findsNothing);
+    });
+
     testWidgets('Retry fetches again', (tester) async {
       await openSheet(tester, app, answer: const Err(NetworkFailure()));
       stubFetch(app, Ok(clipInfo));
@@ -160,6 +179,9 @@ void main() {
       final field = tester.widget<TextField>(urlField);
       expect(field.controller!.text, isEmpty);
       expect(field.focusNode!.hasFocus, isTrue);
+      // The card folds away over 200 ms, taking no taps meanwhile.
+      expect(find.text('This video is private').hitTestable(), findsNothing);
+      await tester.pump(const Duration(milliseconds: 250));
       expect(find.text('This video is private'), findsNothing);
     });
   });
@@ -202,6 +224,93 @@ void main() {
         verify(() => app.ytDlp.update()).called(1);
       },
     );
+
+    group("platform traits keep Android's copy", () {
+      testWidgets('a new version refetches at once, with no restart line', (
+        tester,
+      ) async {
+        when(
+          () => app.ytDlp.status(),
+        ).thenAnswer((_) async => Ok(ytDlpStatus(version: '2026.10.01')));
+        when(
+          () => app.ytDlp.update(),
+        ).thenAnswer((_) async => Ok(ytDlpStatus(version: '2026.10.26')));
+        await openSheet(
+          tester,
+          app,
+          answer: const Err(UnsupportedSiteFailure()),
+          overrides: [
+            platformTraitsProvider.overrideWithValue(PlatformTraits.android),
+          ],
+        );
+
+        await tapCard(tester, 'Update yt-dlp');
+        await tester.pump();
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        verify(() => app.downloader.fetchInfo(clipUrl)).called(2);
+        expect(find.textContaining('restart'), findsNothing);
+      });
+    });
+
+    group('iOS traits', () {
+      testWidgets('a new version says restart and does not refetch', (
+        tester,
+      ) async {
+        when(
+          () => app.ytDlp.status(),
+        ).thenAnswer((_) async => Ok(ytDlpStatus(version: '2026.10.01')));
+        when(
+          () => app.ytDlp.update(),
+        ).thenAnswer((_) async => Ok(ytDlpStatus(version: '2026.10.26')));
+        await openSheet(
+          tester,
+          app,
+          answer: const Err(UnsupportedSiteFailure()),
+          overrides: [
+            platformTraitsProvider.overrideWithValue(PlatformTraits.ios),
+          ],
+        );
+
+        await tapCard(tester, 'Update yt-dlp');
+        await tester.pump();
+        await tester.pump();
+
+        expect(
+          find.text('Updated to 2026.10.26 — restart Fetchr to use it'),
+          findsOneWidget,
+        );
+        verify(() => app.downloader.fetchInfo(clipUrl)).called(1);
+      });
+
+      testWidgets('the running version back refetches as on Android', (
+        tester,
+      ) async {
+        when(
+          () => app.ytDlp.status(),
+        ).thenAnswer((_) async => Ok(ytDlpStatus(version: '2026.10.26')));
+        when(
+          () => app.ytDlp.update(),
+        ).thenAnswer((_) async => Ok(ytDlpStatus(version: '2026.10.26')));
+        await openSheet(
+          tester,
+          app,
+          answer: const Err(UnsupportedSiteFailure()),
+          overrides: [
+            platformTraitsProvider.overrideWithValue(PlatformTraits.ios),
+          ],
+        );
+
+        await tapCard(tester, 'Update yt-dlp');
+        await tester.pump();
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        verify(() => app.downloader.fetchInfo(clipUrl)).called(2);
+        expect(find.textContaining('restart'), findsNothing);
+      });
+    });
 
     testWidgets('a network failure says the update could not run', (
       tester,
@@ -247,6 +356,8 @@ void main() {
       app.router.go(AppRoutes.settings);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
+      // Past the fade-through, which still shows Home's card until it ends.
+      await tester.pump(AppBranchSwitcher.duration);
 
       expect(find.text('Updating…'), findsOneWidget);
     });
@@ -337,6 +448,24 @@ void main() {
 
       expect(enqueued(app).single.quality, Quality.p720);
       expect(find.text('Added to Downloads'), findsOneWidget);
+    });
+
+    testWidgets('a pick and Download click; the queued download confirms', (
+      tester,
+    ) async {
+      await openSheet(tester, app);
+      final calls = recordHaptics(tester);
+
+      await tester.tap(find.text('720p'));
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.tap(find.text('Download 720p'));
+      await tester.pumpAndSettle();
+
+      expect(calls, [
+        'HapticFeedbackType.selectionClick',
+        'HapticFeedbackType.selectionClick',
+        'HapticFeedbackType.successNotification',
+      ]);
     });
 
     testWidgets('the cover row queues the cover photo with its thumbnail', (
@@ -532,6 +661,30 @@ void main() {
       expect(fieldText(tester), clipUrl);
       verify(() => app.downloader.fetchInfo(clipUrl)).called(1);
       expect(formatSheet, findsOneWidget);
+    });
+
+    testWidgets('a shared link ends a launch intro that would cover the '
+        'sheet', (tester) async {
+      stubFetch(app, Ok(clipInfo));
+      final splash = Completer<void>();
+      final home = await pumpHome(
+        tester,
+        app: app,
+        builder: (context, child) =>
+            LaunchIntro(splashGone: () => splash.future, child: child!),
+      );
+      final overlay = find.byKey(launchIntroOverlayKey);
+      expect(overlay, findsOneWidget);
+
+      home.shares.add([sharedText(clipUrl)]);
+      await tester.pump();
+      expect(overlay, findsNothing);
+      await tester.pumpAndSettle();
+      expect(formatSheet, findsOneWidget);
+
+      splash.complete();
+      await tester.pumpAndSettle();
+      expect(overlay, findsNothing);
     });
 
     testWidgets('a link shared while another tab shows opens the sheet', (

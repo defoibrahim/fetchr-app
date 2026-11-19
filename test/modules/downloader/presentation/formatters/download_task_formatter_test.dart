@@ -246,11 +246,8 @@ void main() {
     });
 
     test('a playlist entry names its place', () {
-      expect(
-        of(Quality.p720, index: 3, count: 18),
-        '720p · 3 of 18 in playlist',
-      );
-      expect(of(Quality.mp3, index: 1, count: 2), 'MP3 · 1 of 2 in playlist');
+      expect(of(Quality.p720, index: 3, count: 18), '720p · 3 of 18');
+      expect(of(Quality.mp3, index: 1, count: 2), 'MP3 · 1 of 2');
     });
 
     test('a half-known place is ignored', () {
@@ -297,6 +294,24 @@ void main() {
 
     test('is just the path when no size is known', () {
       expect(of(Quality.best), 'Movies/Fetchr');
+    });
+
+    test('is the path native saved to', () {
+      final meta = downloadTask(
+        status: TaskStatus.completed,
+        request: downloadRequest(quality: Quality.mp3, playlistTitle: 'Mix'),
+        savedPath: 'Music/Fetchr/Mix',
+        totalBytes: mb,
+      ).doneMeta;
+      expect(meta, 'Music/Fetchr/Mix · 1.0 MB');
+    });
+
+    test('a playlist video saved before the path was recorded is flat', () {
+      final meta = downloadTask(
+        status: TaskStatus.completed,
+        request: downloadRequest(quality: Quality.mp3, playlistTitle: 'Mix'),
+      ).doneMeta;
+      expect(meta, 'Music/Fetchr');
     });
   });
 

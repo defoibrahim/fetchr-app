@@ -4,12 +4,14 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../core/gen/assets.gen.dart';
 import '../../../../../core/theme/app_spacing.dart';
 import '../../../../../core/theme/app_text_styles.dart';
 import '../../../../../core/theme/theme_extensions.dart';
 import '../../../../../core/utils/formatters.dart';
 import '../../../../../core/utils/scale.dart';
 import '../../../../../core/widgets/action_menu.dart';
+import '../../../../../core/widgets/app_pressable.dart';
 import '../../../../../core/widgets/media_thumb.dart';
 import '../../../domain/entities/library_item.dart';
 import '../../formatters/library_item_formatter.dart';
@@ -79,52 +81,134 @@ class LibraryCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return ActionMenu(
-      items: [
-        ActionMenuItem.play(onPlay),
-        ActionMenuItem.share(onShare),
-        ActionMenuItem.showInFolder(onOpenFolder),
-        ActionMenuItem.deleteFile(onDelete),
-      ],
-      builder: (context, controller) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onLongPress: controller.open,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _Picture(item: item, onPlay: onPlay),
-            ConstrainedBox(
-              constraints: BoxConstraints(minHeight: AppSizes.touch.r),
-              child: Stack(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.only(
-                      top: Gap.sm.h,
-                      right: _dotsReserve.w,
-                    ),
-                    child: _Text(item: item),
-                  ),
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: MoreActionsDots(controller: controller),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+  Widget build(BuildContext context) => _Tile(
+    menu: [
+      ActionMenuItem.play(onPlay),
+      ActionMenuItem.share(onShare),
+      ActionMenuItem.showInFolder(onOpenFolder),
+      ActionMenuItem.deleteFile(onDelete),
+    ],
+    onTap: onPlay,
+    picture: _Picture(item: item, label: 'Play ${item.name}', onTap: onPlay),
+    title: item.name,
+    meta: item.metaText,
+  );
+}
+
+/// A playlist's files as one tile: its first file's picture, the playlist's
+/// name, and how much is saved. A tap opens the playlist.
+class LibraryPlaylistCard extends StatelessWidget {
+  const LibraryPlaylistCard({
+    super.key,
+    required this.name,
+    required this.items,
+    required this.onOpen,
+    required this.onOpenFolder,
+    required this.onDelete,
+  }) : assert(items.length > 0);
+
+  final String name;
+
+  /// In playlist order.
+  final List<LibraryItem> items;
+  final VoidCallback onOpen;
+  final VoidCallback onOpenFolder;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) => _Tile(
+    menu: [
+      ActionMenuItem.showInFolder(onOpenFolder),
+      ActionMenuItem(
+        icon: Assets.icons.trash,
+        label: 'Delete playlist',
+        onSelected: onDelete,
+        destructive: true,
       ),
-    );
-  }
+    ],
+    onTap: onOpen,
+    picture: _Picture(
+      item: items.first,
+      label: 'Open playlist $name',
+      badge: 'Playlist',
+      onTap: onOpen,
+    ),
+    title: name,
+    meta: items.filesLine,
+  );
+}
+
+/// The picture, then the title and meta beside the dots that open [menu].
+/// The whole tile is one pressable: a tap anywhere runs [onTap], a long press
+/// opens [menu].
+class _Tile extends StatelessWidget {
+  const _Tile({
+    required this.menu,
+    required this.onTap,
+    required this.picture,
+    required this.title,
+    required this.meta,
+  });
+
+  final List<ActionMenuItem> menu;
+  final VoidCallback onTap;
+  final Widget picture;
+  final String title;
+  final String meta;
+
+  @override
+  Widget build(BuildContext context) => ActionMenu(
+    items: menu,
+    builder: (context, controller) => AppPressable(
+      onTap: onTap,
+      onLongPress: controller.open,
+      pressedScale: .98,
+      borderRadius: BorderRadius.circular(Radii.row.r),
+      // The picture is opaque: the ripple goes over it.
+      inkAbove: true,
+      // The dots sit over the ink so they take their own taps; the spacer is
+      // the picture's height and takes none.
+      foreground: Column(
+        children: [
+          const AspectRatio(aspectRatio: _thumbAspect),
+          Align(
+            alignment: Alignment.topRight,
+            heightFactor: 1,
+            child: MoreActionsDots(controller: controller),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          picture,
+          ConstrainedBox(
+            constraints: BoxConstraints(minHeight: AppSizes.touch.r),
+            child: Padding(
+              padding: EdgeInsets.only(top: Gap.sm.h, right: _dotsReserve.w),
+              child: _Text(title: title, meta: meta),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _Picture extends ConsumerWidget {
-  const _Picture({required this.item, required this.onPlay});
+  const _Picture({
+    required this.item,
+    required this.label,
+    required this.onTap,
+    this.badge,
+  });
 
   final LibraryItem item;
-  final VoidCallback onPlay;
+  final String label;
+  final VoidCallback onTap;
+
+  /// Shown where the duration goes, for a tile that stands for many files.
+  final String? badge;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -136,58 +220,45 @@ class _Picture extends ConsumerWidget {
     return Semantics(
       container: true,
       button: true,
-      label: 'Play ${item.name}',
-      onTap: onPlay,
+      label: label,
+      onTap: onTap,
       excludeSemantics: true,
-      child: Stack(
-        children: [
-          MediaThumb(
-            image: path == null ? null : FileImage(File(path)),
-            width: double.infinity,
-            aspectRatio: _thumbAspect,
-            radius: Radii.row,
-            duration: seconds > 0 ? formatDuration(seconds) : null,
-            isAudio: item.isAudio,
-          ),
-          // The ink goes above the picture, which would hide it underneath.
-          Positioned.fill(
-            child: Material(
-              type: MaterialType.transparency,
-              child: InkWell(
-                onTap: onPlay,
-                borderRadius: BorderRadius.circular(Radii.row.r),
-              ),
-            ),
-          ),
-        ],
+      child: MediaThumb(
+        image: path == null ? null : FileImage(File(path)),
+        width: double.infinity,
+        aspectRatio: _thumbAspect,
+        radius: Radii.row,
+        duration: badge ?? (seconds > 0 ? formatDuration(seconds) : null),
+        isAudio: item.isAudio,
       ),
     );
   }
 }
 
 class _Text extends StatelessWidget {
-  const _Text({required this.item});
+  const _Text({required this.title, required this.meta});
 
-  final LibraryItem item;
+  final String title;
+  final String meta;
 
   @override
   Widget build(BuildContext context) {
     final type = context.type;
-    final title = _titleStyle(type);
+    final style = _titleStyle(type);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       spacing: _titleGap.h,
       children: [
         Text(
-          item.name,
+          title,
           maxLines: _titleLines,
           overflow: TextOverflow.ellipsis,
-          style: title,
-          strutStyle: _strut(title),
+          style: style,
+          strutStyle: _strut(style),
         ),
         Text(
-          item.metaText,
+          meta,
           textDirection: TextDirection.ltr,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,

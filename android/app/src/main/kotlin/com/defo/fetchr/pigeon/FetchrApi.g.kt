@@ -502,6 +502,7 @@ data class DownloadTask (
   val errorCode: String? = null,
   val errorMessage: String? = null,
   val savedUri: String? = null,
+  val savedPath: String? = null,
   val createdAtMs: Long,
   val stage: TaskStage,
   val downloadedBytes: Long? = null,
@@ -521,14 +522,15 @@ data class DownloadTask (
       val errorCode = pigeonVar_list[5] as String?
       val errorMessage = pigeonVar_list[6] as String?
       val savedUri = pigeonVar_list[7] as String?
-      val createdAtMs = pigeonVar_list[8] as Long
-      val stage = pigeonVar_list[9] as TaskStage
-      val downloadedBytes = pigeonVar_list[10] as Long?
-      val totalBytes = pigeonVar_list[11] as Long?
-      val speedBytesPerSec = pigeonVar_list[12] as Long?
-      val stalled = pigeonVar_list[13] as Boolean
-      val finishedAtMs = pigeonVar_list[14] as Long?
-      return DownloadTask(id, request, status, progress, etaSeconds, errorCode, errorMessage, savedUri, createdAtMs, stage, downloadedBytes, totalBytes, speedBytesPerSec, stalled, finishedAtMs)
+      val savedPath = pigeonVar_list[8] as String?
+      val createdAtMs = pigeonVar_list[9] as Long
+      val stage = pigeonVar_list[10] as TaskStage
+      val downloadedBytes = pigeonVar_list[11] as Long?
+      val totalBytes = pigeonVar_list[12] as Long?
+      val speedBytesPerSec = pigeonVar_list[13] as Long?
+      val stalled = pigeonVar_list[14] as Boolean
+      val finishedAtMs = pigeonVar_list[15] as Long?
+      return DownloadTask(id, request, status, progress, etaSeconds, errorCode, errorMessage, savedUri, savedPath, createdAtMs, stage, downloadedBytes, totalBytes, speedBytesPerSec, stalled, finishedAtMs)
     }
   }
   fun toList(): List<Any?> {
@@ -541,6 +543,7 @@ data class DownloadTask (
       errorCode,
       errorMessage,
       savedUri,
+      savedPath,
       createdAtMs,
       stage,
       downloadedBytes,
@@ -558,7 +561,7 @@ data class DownloadTask (
       return true
     }
     val other = other as DownloadTask
-    return FetchrApiPigeonUtils.deepEquals(this.id, other.id) && FetchrApiPigeonUtils.deepEquals(this.request, other.request) && FetchrApiPigeonUtils.deepEquals(this.status, other.status) && FetchrApiPigeonUtils.deepEquals(this.progress, other.progress) && FetchrApiPigeonUtils.deepEquals(this.etaSeconds, other.etaSeconds) && FetchrApiPigeonUtils.deepEquals(this.errorCode, other.errorCode) && FetchrApiPigeonUtils.deepEquals(this.errorMessage, other.errorMessage) && FetchrApiPigeonUtils.deepEquals(this.savedUri, other.savedUri) && FetchrApiPigeonUtils.deepEquals(this.createdAtMs, other.createdAtMs) && FetchrApiPigeonUtils.deepEquals(this.stage, other.stage) && FetchrApiPigeonUtils.deepEquals(this.downloadedBytes, other.downloadedBytes) && FetchrApiPigeonUtils.deepEquals(this.totalBytes, other.totalBytes) && FetchrApiPigeonUtils.deepEquals(this.speedBytesPerSec, other.speedBytesPerSec) && FetchrApiPigeonUtils.deepEquals(this.stalled, other.stalled) && FetchrApiPigeonUtils.deepEquals(this.finishedAtMs, other.finishedAtMs)
+    return FetchrApiPigeonUtils.deepEquals(this.id, other.id) && FetchrApiPigeonUtils.deepEquals(this.request, other.request) && FetchrApiPigeonUtils.deepEquals(this.status, other.status) && FetchrApiPigeonUtils.deepEquals(this.progress, other.progress) && FetchrApiPigeonUtils.deepEquals(this.etaSeconds, other.etaSeconds) && FetchrApiPigeonUtils.deepEquals(this.errorCode, other.errorCode) && FetchrApiPigeonUtils.deepEquals(this.errorMessage, other.errorMessage) && FetchrApiPigeonUtils.deepEquals(this.savedUri, other.savedUri) && FetchrApiPigeonUtils.deepEquals(this.savedPath, other.savedPath) && FetchrApiPigeonUtils.deepEquals(this.createdAtMs, other.createdAtMs) && FetchrApiPigeonUtils.deepEquals(this.stage, other.stage) && FetchrApiPigeonUtils.deepEquals(this.downloadedBytes, other.downloadedBytes) && FetchrApiPigeonUtils.deepEquals(this.totalBytes, other.totalBytes) && FetchrApiPigeonUtils.deepEquals(this.speedBytesPerSec, other.speedBytesPerSec) && FetchrApiPigeonUtils.deepEquals(this.stalled, other.stalled) && FetchrApiPigeonUtils.deepEquals(this.finishedAtMs, other.finishedAtMs)
   }
 
   override fun hashCode(): Int {
@@ -571,6 +574,7 @@ data class DownloadTask (
     result = 31 * result + FetchrApiPigeonUtils.deepHash(this.errorCode)
     result = 31 * result + FetchrApiPigeonUtils.deepHash(this.errorMessage)
     result = 31 * result + FetchrApiPigeonUtils.deepHash(this.savedUri)
+    result = 31 * result + FetchrApiPigeonUtils.deepHash(this.savedPath)
     result = 31 * result + FetchrApiPigeonUtils.deepHash(this.createdAtMs)
     result = 31 * result + FetchrApiPigeonUtils.deepHash(this.stage)
     result = 31 * result + FetchrApiPigeonUtils.deepHash(this.downloadedBytes)
@@ -581,7 +585,7 @@ data class DownloadTask (
     return result
   }
   override fun toString(): String {
-    return "DownloadTask(id=$id, request=$request, status=$status, progress=$progress, etaSeconds=$etaSeconds, errorCode=$errorCode, errorMessage=$errorMessage, savedUri=$savedUri, createdAtMs=$createdAtMs, stage=$stage, downloadedBytes=$downloadedBytes, totalBytes=$totalBytes, speedBytesPerSec=$speedBytesPerSec, stalled=$stalled, finishedAtMs=$finishedAtMs)"
+    return "DownloadTask(id=$id, request=$request, status=$status, progress=$progress, etaSeconds=$etaSeconds, errorCode=$errorCode, errorMessage=$errorMessage, savedUri=$savedUri, savedPath=$savedPath, createdAtMs=$createdAtMs, stage=$stage, downloadedBytes=$downloadedBytes, totalBytes=$totalBytes, speedBytesPerSec=$speedBytesPerSec, stalled=$stalled, finishedAtMs=$finishedAtMs)"
   }
 }
 
@@ -860,6 +864,11 @@ interface FetchrHostApi {
   fun enqueue(requests: List<DownloadRequest>)
   fun cancel(id: String)
   fun retry(id: String)
+  /**
+   * The queued tasks of [ids] start in that order, before the other queued
+   * ones that come after them.
+   */
+  fun reorder(ids: List<String>)
   fun pause(id: String)
   fun resume(id: String)
   fun pauseAll()
@@ -878,6 +887,9 @@ interface FetchrHostApi {
   suspend fun updateYtDlp(): YtDlpStatus
   fun setYtDlpAutoUpdate(enabled: Boolean)
   fun setAccentColor(argb: Long)
+  fun trackPlayer(handle: Long)
+  fun untrackPlayer(handle: Long)
+  fun androidSdkInt(): Long
   suspend fun awaitLaunchSplash()
 
   companion object {
@@ -952,6 +964,24 @@ interface FetchrHostApi {
             val idArg = args[0] as String
             val wrapped: List<Any?> = try {
               api.retry(idArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              FetchrApiPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.grabby.FetchrHostApi.reorder$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val idsArg = args[0] as List<String>
+            val wrapped: List<Any?> = try {
+              api.reorder(idsArg)
               listOf(null)
             } catch (exception: Throwable) {
               FetchrApiPigeonUtils.wrapError(exception)
@@ -1282,6 +1312,57 @@ interface FetchrHostApi {
             val wrapped: List<Any?> = try {
               api.setAccentColor(argbArg)
               listOf(null)
+            } catch (exception: Throwable) {
+              FetchrApiPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.grabby.FetchrHostApi.trackPlayer$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val handleArg = args[0] as Long
+            val wrapped: List<Any?> = try {
+              api.trackPlayer(handleArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              FetchrApiPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.grabby.FetchrHostApi.untrackPlayer$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val handleArg = args[0] as Long
+            val wrapped: List<Any?> = try {
+              api.untrackPlayer(handleArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              FetchrApiPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.grabby.FetchrHostApi.androidSdkInt$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.androidSdkInt())
             } catch (exception: Throwable) {
               FetchrApiPigeonUtils.wrapError(exception)
             }

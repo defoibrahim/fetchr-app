@@ -9,8 +9,10 @@ import 'package:grabby/app/shared/download_prefs_provider.dart';
 import 'package:grabby/app/theme/accent_provider.dart';
 import 'package:grabby/core/logging/app_logger.dart';
 import 'package:grabby/core/networking/interceptors.dart';
+import 'package:grabby/core/platform/platform_traits.dart';
 import 'package:grabby/core/services/storage/app_storage.dart';
 import 'package:grabby/core/theme/theme.dart';
+import 'package:grabby/core/utils/haptics.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -24,9 +26,15 @@ void main() {
   late MockFetchrHostApi host;
 
   // `containerWith` has no room for the host API, which init now calls.
-  ProviderContainer containerFor(AppStorage storage) => containerWith(
+  ProviderContainer containerFor(
+    AppStorage storage, {
+    PlatformTraits traits = PlatformTraits.android,
+  }) => containerWith(
     storage,
-    overrides: [fetchrHostApiProvider.overrideWithValue(host)],
+    overrides: [
+      fetchrHostApiProvider.overrideWithValue(host),
+      platformTraitsProvider.overrideWithValue(traits),
+    ],
   );
 
   setUpAll(() => registerFallbackValue(0));
@@ -45,6 +53,7 @@ void main() {
     requests.clear();
     host = MockFetchrHostApi();
     when(() => host.setAccentColor(any())).thenAnswer((_) async {});
+    when(() => host.androidSdkInt()).thenAnswer((_) async => 34);
   });
 
   tearDown(() {
@@ -52,6 +61,7 @@ void main() {
         .setMockMethodCallHandler(_channel, null);
     AppInterceptors.onUnauthorized = null;
     AppLogger.reset();
+    AppHaptics.androidSdk = null;
   });
 
   testWidgets('init loads the saved download prefs before the first frame', (
@@ -92,6 +102,7 @@ void main() {
 
     expect(container.read(accentProvider), blue);
     verify(() => host.setAccentColor(blue.toARGB32())).called(1);
+    verify(() => host.androidSdkInt()).called(1);
     verifyNoMoreInteractions(host);
   });
 
@@ -113,24 +124,57 @@ void main() {
     expect(lines.single, startsWith('Could not send the accent to native'));
   });
 
-  testWidgets('permissions are requested once, after the first frame', (
-    tester,
-  ) async {
-    answerPermissions(() async => <int, int>{});
-    final container = containerFor(MemoryStorage());
-    addTearDown(container.dispose);
+  group("platform traits keep Android's copy", () {
+    testWidgets('permissions are requested once, after the first frame', (
+      tester,
+    ) async {
+      answerPermissions(() async => <int, int>{});
+      final container = containerFor(MemoryStorage());
+      addTearDown(container.dispose);
 
-    await AppInitializer.init(container);
-    await tester.pumpWidget(const SizedBox());
+      await AppInitializer.init(container);
+      await tester.pumpWidget(const SizedBox());
 
-    expect(requests, [
-      [
-        Permission.notification.value,
-        Permission.storage.value,
-        Permission.videos.value,
-        Permission.audio.value,
-      ],
-    ]);
+      expect(requests, [
+        [
+          Permission.notification.value,
+          Permission.storage.value,
+          Permission.videos.value,
+          Permission.audio.value,
+        ],
+      ]);
+    });
+  });
+
+  group('iOS traits', () {
+    // M6 posts the first notification; iOS asks for it once in a lifetime.
+    testWidgets('no permission is requested yet', (tester) async {
+      answerPermissions(() async => <int, int>{});
+      final container = containerFor(
+        MemoryStorage(),
+        traits: PlatformTraits.ios,
+      );
+      addTearDown(container.dispose);
+
+      await AppInitializer.init(container);
+      await tester.pumpWidget(const SizedBox());
+
+      expect(requests, isEmpty);
+    });
+
+    testWidgets('the Android API level is not read', (tester) async {
+      answerPermissions(() async => <int, int>{});
+      final container = containerFor(
+        MemoryStorage(),
+        traits: PlatformTraits.ios,
+      );
+      addTearDown(container.dispose);
+
+      await AppInitializer.init(container);
+      await tester.pumpWidget(const SizedBox());
+
+      verifyNever(() => host.androidSdkInt());
+    });
   });
 
   testWidgets('a failing permission request is logged, not thrown', (
@@ -146,5 +190,35 @@ void main() {
     await tester.pumpWidget(const SizedBox());
 
     expect(lines.single, startsWith('Could not request permissions'));
+  });
+
+  testWidgets('init tells the haptics which Android it runs on', (
+    tester,
+  ) async {
+    answerPermissions(() async => <int, int>{});
+    when(() => host.androidSdkInt()).thenAnswer((_) async => 29);
+    final container = containerFor(MemoryStorage());
+    addTearDown(container.dispose);
+
+    await AppInitializer.init(container);
+    await tester.pump();
+
+    expect(AppHaptics.androidSdk, 29);
+  });
+
+  testWidgets('a failure reading the Android version does not stop init', (
+    tester,
+  ) async {
+    answerPermissions(() async => <int, int>{});
+    when(
+      () => host.androidSdkInt(),
+    ).thenThrow(PlatformException(code: 'unknown'));
+    final container = containerFor(MemoryStorage());
+    addTearDown(container.dispose);
+
+    await AppInitializer.init(container);
+    await tester.pump();
+
+    expect(AppHaptics.androidSdk, isNull);
   });
 }

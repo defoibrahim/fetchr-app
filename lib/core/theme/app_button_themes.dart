@@ -17,6 +17,11 @@ abstract final class AppButtonThemes {
   static const _pressedAlpha = .12;
   static const _hoveredAlpha = .08;
 
+  // A filled button's fill is the ink in light, so ink at 12% on it would not
+  // show; its own label colour does.
+  static const _filledPressedAlpha = .16;
+  static const _filledHoveredAlpha = .10;
+
   static Color _faded(Color color, Set<WidgetState> states) =>
       states.contains(WidgetState.disabled)
       ? color.withValues(alpha: color.a * _disabledAlpha)
@@ -26,6 +31,31 @@ abstract final class AppButtonThemes {
   /// colours (AppButton's destructive) keeps the same disabled look.
   static WidgetStateProperty<Color> fading(Color color) =>
       WidgetStateProperty.resolveWith((states) => _faded(color, states));
+
+  /// The pressed and focused overlay, and a lighter one on hover: [ink] at
+  /// [pressed] and [hovered] alpha.
+  static WidgetStateProperty<Color?> overlay(
+    Color ink, {
+    double pressed = _pressedAlpha,
+    double hovered = _hoveredAlpha,
+  }) => WidgetStateProperty.resolveWith((states) {
+    if (states.contains(WidgetState.pressed) ||
+        states.contains(WidgetState.focused)) {
+      return ink.withValues(alpha: pressed);
+    }
+    if (states.contains(WidgetState.hovered)) {
+      return ink.withValues(alpha: hovered);
+    }
+    return null;
+  });
+
+  /// [overlay] for a button filled with a solid colour, in its label's
+  /// colour [onFill].
+  static WidgetStateProperty<Color?> filledOverlay(Color onFill) => overlay(
+    onFill,
+    pressed: _filledPressedAlpha,
+    hovered: _filledHoveredAlpha,
+  );
 
   static ButtonStyle _base(AppTokens t, AppTextStyles type) => ButtonStyle(
     minimumSize: const WidgetStatePropertyAll(Size(64, AppSizes.buttonMedium)),
@@ -43,16 +73,7 @@ abstract final class AppButtonThemes {
     textStyle: WidgetStatePropertyAll(
       type.body.copyWith(fontWeight: FontWeight.w600),
     ),
-    overlayColor: WidgetStateProperty.resolveWith((states) {
-      if (states.contains(WidgetState.pressed) ||
-          states.contains(WidgetState.focused)) {
-        return t.text.withValues(alpha: _pressedAlpha);
-      }
-      if (states.contains(WidgetState.hovered)) {
-        return t.text.withValues(alpha: _hoveredAlpha);
-      }
-      return null;
-    }),
+    overlayColor: overlay(t.text),
   );
 
   static FilledButtonThemeData filled(
@@ -63,6 +84,7 @@ abstract final class AppButtonThemes {
     style: _base(t, type).copyWith(
       backgroundColor: fading(scheme.primary),
       foregroundColor: fading(scheme.onPrimary),
+      overlayColor: filledOverlay(scheme.onPrimary),
     ),
   );
 

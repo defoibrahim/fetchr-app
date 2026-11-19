@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/logging/app_logger.dart';
 import '../../core/networking/interceptors.dart';
+import '../../core/utils/haptics.dart';
 import '../di/core_providers.dart';
 import '../shared/download_prefs_provider.dart';
 import '../theme/accent_provider.dart';
@@ -26,24 +27,40 @@ abstract final class AppInitializer {
     // that.
     unawaited(container.read(accentProvider.notifier).sendToNative());
 
+    final traits = container.read(platformTraitsProvider);
+    if (traits.readsAndroidSdk) unawaited(_readAndroidSdk(container));
+    final permissions = [
+      if (traits.asksNotificationPermission) Permission.notification,
+      if (traits.asksStoragePermission) ...[
+        Permission.storage,
+        Permission.videos,
+        Permission.audio,
+      ],
+    ];
+    if (permissions.isEmpty) return;
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => unawaited(_requestPermissions()),
+      (_) => unawaited(_requestPermissions(permissions)),
     );
   }
 
   // Asked once the first frame is up so the system dialogs don't delay it.
   // Denial is fine: downloads still run, and Android 10+ needs no storage
-  // access to save through MediaStore.
-  static Future<void> _requestPermissions() async {
+  // access to save through MediaStore. iOS saves inside the app's own folder.
+  static Future<void> _requestPermissions(List<Permission> permissions) async {
     try {
-      await [
-        Permission.notification,
-        Permission.storage,
-        Permission.videos,
-        Permission.audio,
-      ].request();
+      await permissions.request();
     } catch (e, s) {
       AppLogger.error('Could not request permissions', e, s);
+    }
+  }
+
+  static Future<void> _readAndroidSdk(ProviderContainer container) async {
+    try {
+      AppHaptics.androidSdk = await container
+          .read(fetchrHostApiProvider)
+          .androidSdkInt();
+    } catch (e, s) {
+      AppLogger.error('Could not read the Android version', e, s);
     }
   }
 

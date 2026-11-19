@@ -45,13 +45,13 @@ object MediaLibrary {
         MediaStore.MediaColumns.DATE_ADDED,
     )
 
+    // [folder] is already safe: RequestBuilder.saveFolder, which may add a playlist subfolder.
     suspend fun save(context: Context, file: File, kind: MediaKind, folder: String): String {
-        val safe = RequestBuilder.safeFolder(folder)
         val mime = mimeFor(file, kind)
         return if (scoped) {
-            saveScoped(context, file, kind, safe, mime)
+            saveScoped(context, file, kind, folder, mime)
         } else {
-            saveLegacy(context, file, kind, safe, mime)
+            saveLegacy(context, file, kind, folder, mime)
         }
     }
 
@@ -277,21 +277,15 @@ object MediaLibrary {
         } else {
             arrayOf(MediaStore.MediaColumns.WIDTH, MediaStore.MediaColumns.HEIGHT)
         }
-        // The scoped selection pins RELATIVE_PATH, so every row has this value and the column is never read.
-        val pinned = "${rootDir(kind)}/$folder/"
-        val (selection, args) = if (scoped) {
-            // MediaProvider stores RELATIVE_PATH with a trailing slash.
-            "${MediaStore.MediaColumns.RELATIVE_PATH} = ?" to arrayOf(pinned)
-        } else {
-            val prefix = legacyDir(kind, folder).path
-                .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            "${MediaStore.MediaColumns.DATA} LIKE ? ESCAPE '\\'" to arrayOf("$prefix/%")
-        }
-        // Before API 29 the folder is only in DATA, the file's absolute path.
-        val legacyPath = if (scoped) emptyArray<String>() else arrayOf(MediaStore.MediaColumns.DATA)
+        // The folder and the playlist subfolders under it. MediaProvider stores RELATIVE_PATH with a trailing slash;
+        // before API 29 the folder is only in DATA, the file's absolute path.
+        val prefix = if (scoped) "${rootDir(kind)}/$folder/" else "${legacyDir(kind, folder).path}/"
+        val pathColumn = if (scoped) MediaStore.MediaColumns.RELATIVE_PATH else MediaStore.MediaColumns.DATA
+        val selection = "$pathColumn LIKE ? ESCAPE '\\'"
+        val args = arrayOf(prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
         val cursor = context.contentResolver.query(
             base,
-            PROJECTION_BASE + duration + legacyPath + dimensions,
+            PROJECTION_BASE + duration + pathColumn + dimensions,
             selection,
             args,
             "${MediaStore.MediaColumns.DATE_ADDED} DESC",
@@ -303,8 +297,8 @@ object MediaLibrary {
             val size = c.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
             val added = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
             val dur = c.getColumnIndexOrThrow(duration)
+            val path = c.getColumnIndexOrThrow(pathColumn)
             // -1 for a column the query did not ask for.
-            val data = c.getColumnIndex(MediaStore.MediaColumns.DATA)
             val width = c.getColumnIndex(MediaStore.MediaColumns.WIDTH)
             val height = c.getColumnIndex(MediaStore.MediaColumns.HEIGHT)
             buildList {
@@ -320,7 +314,7 @@ object MediaLibrary {
                             dateAddedMs = c.getLong(added) * 1000,
                             width = c.positiveLong(width),
                             height = c.positiveLong(height),
-                            relativePath = if (scoped) pinned else legacyRelativePath(c.getString(data)),
+                            relativePath = c.getString(path).let { if (scoped) it else legacyRelativePath(it) },
                         ),
                     )
                 }
@@ -348,7 +342,7 @@ object MediaLibrary {
                 else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         }
 
-    private fun rootDir(kind: MediaKind): String =
+    fun rootDir(kind: MediaKind): String =
         when (kind) {
             MediaKind.VIDEO -> Environment.DIRECTORY_MOVIES
             MediaKind.AUDIO -> Environment.DIRECTORY_MUSIC

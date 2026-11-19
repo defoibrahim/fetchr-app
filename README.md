@@ -30,10 +30,15 @@
 <p align="center">
   <img src="docs/images/screenshots/home.png" width="31%" alt="Home: paste a link">
   <img src="docs/images/screenshots/formats.png" width="31%" alt="Format sheet with each quality and its size">
-  <img src="docs/images/screenshots/downloads.png" width="31%" alt="Downloads, done today">
+  <img src="docs/images/screenshots/playlist-picker.png" width="31%" alt="Playlist picker: one quality, tick the videos you want">
 </p>
 <p align="center">
-  <img src="docs/images/screenshots/library.png" width="31%" alt="Library of saved videos">
+  <img src="docs/images/screenshots/playlist-queue.png" width="31%" alt="Live playlist queue: drag to reorder, skip, pause or stop">
+  <img src="docs/images/screenshots/downloads.png" width="31%" alt="Downloads: one card per playlist with progress and time left">
+  <img src="docs/images/screenshots/library.png" width="31%" alt="Library: a playlist is one tile next to single files">
+</p>
+<p align="center">
+  <img src="docs/images/screenshots/library-playlist.png" width="31%" alt="A saved playlist, numbered in order">
   <img src="docs/images/screenshots/player.png" width="31%" alt="Built-in player with file details">
   <img src="docs/images/screenshots/settings.png" width="31%" alt="Settings in the light theme">
 </p>
@@ -42,7 +47,7 @@
 
 - **Any link.** Paste a link, let Fetchr pick it up from your clipboard, or share a link to Fetchr from your browser or any other app. Public videos from the sites [yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) work; private, members-only and DRM-protected videos don't.
 - **Any format.** The format sheet shows the title, thumbnail and the qualities the video offers: Best, 1080p, 720p or 480p video, MP3 audio, or the cover image, with an estimated size where the site reports one.
-- **Playlists.** Open a playlist, tick the items you want and download them all in one quality.
+- **Playlists you can steer.** Open a playlist, tick the videos you want and download them in one quality. The playlist shows up as one card with its progress and time left, and its queue lets you drag videos up or down, skip one (with undo), pause or resume all, or stop the rest and keep what finished. Each playlist saves to its own folder, numbered in playlist order, and shows up as one tile in the Library. A video link that belongs to a playlist asks whether you want just the video or the whole playlist.
 - **Video to MP3.** Pick any video on your phone, from the gallery or the Files app, and Fetchr turns it into an MP3, with the same progress and notifications as a download. No permission needed.
 - **Downloads that keep going.** Two at a time, with speed, size and time left, plus pause, resume, cancel and retry. They keep running when you leave the app, and a notification tells you when each one is done.
 - **Your files, where you expect them.** Videos go to `Movies/Fetchr`, audio to `Music/Fetchr` and covers to `Pictures/Fetchr`, so your gallery and music apps see them. You can rename the folder; the Library shows the current one.
@@ -99,7 +104,7 @@ A Sentry report holds the error and where it happened, the app's recent log mess
 
 ## Build from source
 
-You need the Android SDK with platform 37, JDK 17 and Flutter 3.47.7. [fvm](https://fvm.app) installs that Flutter for you and is what the project's scripts use. The first build downloads libmpv and youtubedl-android, so it needs a network connection.
+You need the Android SDK with platform 37, JDK 17 and Flutter 3.47.9. [fvm](https://fvm.app) installs that Flutter for you and is what the project's scripts use. The first build downloads libmpv and youtubedl-android, so it needs a network connection.
 
 ### Debug build (for development only)
 
@@ -141,7 +146,7 @@ Fetchr is a Flutter app with its download engine in Kotlin. The Flutter side use
 
 Fetchr stands on [yt-dlp](https://github.com/yt-dlp/yt-dlp), [youtubedl-android](https://github.com/JunkFood02/youtubedl-android), [FFmpeg](https://ffmpeg.org), [aria2](https://aria2.github.io) and [media_kit](https://github.com/media-kit/media-kit) (libmpv), each under its own license. It uses the [Bricolage Grotesque](https://github.com/ateliertriay/bricolage), [Geist](https://github.com/vercel/geist-font) and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) fonts under the SIL Open Font License.
 
-The screenshots show *Spring*, *Coffee Run* and *Caminandes 3: Llamigos* by [Blender Studio](https://studio.blender.org), released under Creative Commons Attribution.
+The screenshots show films by [Blender Studio](https://studio.blender.org) (*Big Buck Bunny*, *Sintel*, *Spring*, *Coffee Run*, *Caminandes 3: Llamigos* and others), released under Creative Commons Attribution.
 
 ## Disclaimer
 

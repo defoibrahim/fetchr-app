@@ -1,13 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../gen/assets.gen.dart';
 import '../theme/app_button_themes.dart';
+import '../theme/app_motion.dart';
 import '../theme/app_spacing.dart';
 import '../theme/theme_extensions.dart';
 import '../utils/scale.dart';
+import 'app_fade_switcher.dart';
 import 'app_icon.dart';
+import 'press_scale.dart';
 
-enum AppButtonVariant { filled, outlined, text, destructive }
+/// `destructiveOutline` is the error-tinted outline for a strong action that
+/// can be undone, such as stopping a playlist.
+enum AppButtonVariant {
+  filled,
+  outlined,
+  text,
+  destructive,
+  destructiveOutline,
+}
 
 enum AppButtonSize { large, medium, compact, small }
 
@@ -64,25 +76,42 @@ class AppButton extends StatelessWidget {
         : onPressed;
 
     final style = _style(context, height: box.height.h, radius: box.radius.r);
-    final content = _content();
-    final button = switch (variant) {
+    // Keyed by the kind of content, so the label and the spinner cross-fade
+    // and a label change alone does not.
+    final content = AppFadeSwitcher(
+      spec: Motion.fade,
+      alignment: Alignment.center,
+      child: KeyedSubtree(key: ValueKey(isLoading), child: _content()),
+    );
+    Widget button([WidgetStatesController? states]) => switch (variant) {
       AppButtonVariant.filled || AppButtonVariant.destructive => FilledButton(
         onPressed: handler,
         style: style,
+        statesController: states,
         child: content,
       ),
-      AppButtonVariant.outlined => OutlinedButton(
+      AppButtonVariant.outlined ||
+      AppButtonVariant.destructiveOutline => OutlinedButton(
         onPressed: handler,
         style: style,
+        statesController: states,
         child: content,
       ),
       AppButtonVariant.text => TextButton(
         onPressed: handler,
         style: style,
+        statesController: states,
         child: content,
       ),
     };
-    return expanded ? SizedBox(width: double.infinity, child: button) : button;
+    // The small sizes sit in rows of content, where a shrinking button would
+    // jostle its neighbours; the ripple is enough there.
+    final scaled = switch (size) {
+      AppButtonSize.large ||
+      AppButtonSize.medium => _PressScale(builder: button),
+      AppButtonSize.compact || AppButtonSize.small => button(),
+    };
+    return expanded ? SizedBox(width: double.infinity, child: scaled) : scaled;
   }
 
   /// The button themes own colour, border, ink and the disabled look. This is
@@ -116,8 +145,18 @@ class AppButton extends StatelessWidget {
       backgroundColor: destructive
           ? AppButtonThemes.fading(tokens.error)
           : null,
-      foregroundColor: destructive
-          ? AppButtonThemes.fading(tokens.onError)
+      foregroundColor: switch (variant) {
+        AppButtonVariant.destructive => AppButtonThemes.fading(tokens.onError),
+        AppButtonVariant.destructiveOutline => AppButtonThemes.fading(
+          tokens.errorText,
+        ),
+        _ => null,
+      },
+      overlayColor: destructive
+          ? AppButtonThemes.filledOverlay(tokens.onError)
+          : null,
+      side: variant == AppButtonVariant.destructiveOutline
+          ? WidgetStatePropertyAll(BorderSide(color: tokens.errorBorder))
           : null,
       // Every other icon follows the foreground; the filled one is the accent
       // on ink in light.
@@ -165,6 +204,54 @@ class AppButton extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Shrinks the button a little while it is held, and not at all under
+/// reduce motion. It reads the press from the button's own states, so it
+/// follows the same tap the ripple does.
+class _PressScale extends StatefulWidget {
+  const _PressScale({required this.builder});
+
+  final Widget Function(WidgetStatesController states) builder;
+
+  @override
+  State<_PressScale> createState() => _PressScaleState();
+}
+
+class _PressScaleState extends State<_PressScale> {
+  final _states = WidgetStatesController();
+  var _pressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _states.addListener(_onStates);
+  }
+
+  @override
+  void dispose() {
+    _states.dispose();
+    super.dispose();
+  }
+
+  // A button that turns disabled mid-press drops `pressed` while it builds,
+  // when this ancestor cannot rebuild; it catches up after the frame.
+  void _onStates() {
+    final pressed = _states.value.contains(WidgetState.pressed);
+    if (pressed == _pressed) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _onStates();
+      });
+      return;
+    }
+    setState(() => _pressed = pressed);
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      PressScale(pressed: _pressed, child: widget.builder(_states));
 }
 
 /// In the button's label colour, which is already faded when it is disabled.

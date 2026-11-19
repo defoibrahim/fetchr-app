@@ -27,7 +27,7 @@ internal object TaskTransitions {
         }
 
     // A pause or a resume may have moved the task while the file was saved; a cancel or a remove keeps its outcome.
-    fun complete(t: DownloadTask, savedUri: String, bytes: Long, nowMs: Long): DownloadTask? =
+    fun complete(t: DownloadTask, savedUri: String, savedPath: String, bytes: Long, nowMs: Long): DownloadTask? =
         if (isUnfinished(t)) {
             t.halted().copy(
                 status = TaskStatus.COMPLETED,
@@ -38,6 +38,7 @@ internal object TaskTransitions {
                 errorCode = null,
                 errorMessage = null,
                 savedUri = savedUri,
+                savedPath = savedPath,
                 finishedAtMs = nowMs,
             )
         } else {
@@ -77,6 +78,7 @@ internal object TaskTransitions {
         errorCode = null,
         errorMessage = null,
         savedUri = null,
+        savedPath = null,
         finishedAtMs = null,
     )
 }

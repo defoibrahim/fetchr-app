@@ -127,16 +127,17 @@ class TaskTransitionsTest {
 
     @Test fun completeLandsFromAnyUnfinishedStatusOnly() {
         for (from in listOf(TaskStatus.RUNNING, TaskStatus.PAUSED, TaskStatus.QUEUED)) {
-            val done = TaskTransitions.complete(task(status = from, errorCode = "network"), "content://m/1", 90L, 7L)!!
+            val done = TaskTransitions.complete(task(status = from, errorCode = "network"), "content://m/1", "Movies/Fetchr", 90L, 7L)!!
             assertEquals(TaskStatus.COMPLETED, done.status)
             assertEquals("content://m/1", done.savedUri)
+            assertEquals("Movies/Fetchr", done.savedPath)
             assertEquals(90L, done.totalBytes)
             assertEquals(7L, done.finishedAtMs)
             assertNull(done.errorCode)
             assertNull(done.speedBytesPerSec)
         }
         for (from in listOf(TaskStatus.CANCELED, TaskStatus.FAILED, TaskStatus.COMPLETED)) {
-            assertNull("$from", TaskTransitions.complete(task(status = from), "content://m/1", 90L, 7L))
+            assertNull("$from", TaskTransitions.complete(task(status = from), "content://m/1", "Movies/Fetchr", 90L, 7L))
         }
     }
 

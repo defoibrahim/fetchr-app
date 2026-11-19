@@ -4,15 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../../../../../core/gen/assets.gen.dart';
+import '../../../../../core/theme/app_motion.dart';
 import '../../../../../core/theme/app_spacing.dart';
 import '../../../../../core/theme/app_tokens.dart';
 import '../../../../../core/theme/theme_extensions.dart';
 import '../../../../../core/utils/formatters.dart';
+import '../../../../../core/utils/haptics.dart';
 import '../../../../../core/utils/scale.dart';
+import '../../../../../core/widgets/app_fade_switcher.dart';
 import '../../../../../core/widgets/app_icon.dart';
 
 const _hideAfter = Duration(seconds: 3);
-const _fade = Duration(milliseconds: 200);
 const _seekStep = Duration(seconds: 10);
 
 const _skipSize = 48.0;
@@ -23,10 +25,14 @@ const _buttonGap = 36.0;
 const _skipScrimAlpha = .45;
 const _sidePad = 14.0;
 
+// Play and pause morph a touch slower than a plain icon swap: the glyphs
+// differ more.
+const _playSwap = MotionSpec(Duration(milliseconds: 180), Motion.standard);
+
 /// The player's overlay on [child]: skip back and forward, play and pause, the
-/// time, fullscreen and a seek bar. A tap shows or hides it, and it hides itself
-/// 3 seconds after the last touch while playing; a double tap on a half seeks 10
-/// seconds that way.
+/// time, fullscreen and a seek bar. A touch shows it as the finger lands, a tap
+/// hides it, and it hides itself 3 seconds after the last touch while playing;
+/// a double tap on a half seeks 10 seconds that way.
 class PlayerControls extends StatefulWidget {
   const PlayerControls({
     super.key,
@@ -52,6 +58,9 @@ class _PlayerControlsState extends State<PlayerControls> {
   Timer? _hideTimer;
   var _visible = true;
   late bool _playing;
+
+  /// What a tap on play or pause asked for, shown until the player reports.
+  bool? _pendingPlaying;
   late Duration _duration;
 
   // The player's latest position, always current for _seekTo and _skip.
@@ -65,6 +74,16 @@ class _PlayerControlsState extends State<PlayerControls> {
   double? _scrub;
   var _tapX = 0.0;
 
+  // The touch that brought the overlay back; its tap must not hide it again.
+  var _shownOnDown = false;
+
+  // Until that touch settles as a tap or a double tap, the shown overlay still
+  // ignores touches: the second tap of a double tap must reach the seek layer,
+  // not a button or the slider that appeared under the finger.
+  var _settling = false;
+
+  bool get _shownPlaying => _pendingPlaying ?? _playing;
+
   @override
   void initState() {
     super.initState();
@@ -76,7 +95,10 @@ class _PlayerControlsState extends State<PlayerControls> {
     final stream = player.stream;
     _subscriptions.addAll([
       stream.playing.listen((playing) {
-        setState(() => _playing = playing);
+        setState(() {
+          _playing = playing;
+          _pendingPlaying = null;
+        });
         _restartTimer();
       }),
       stream.position.listen((value) {
@@ -113,14 +135,47 @@ class _PlayerControlsState extends State<PlayerControls> {
     _hideTimer = Timer(_hideAfter, () => setState(() => _visible = false));
   }
 
-  void _toggle() {
-    setState(() => _visible = !_visible);
-    if (_visible) _shown.value = _position;
+  void _setVisible(bool visible) {
+    setState(() => _visible = visible);
+    if (visible) _shown.value = _position;
     _restartTimer();
   }
 
+  // A single tap only counts once the double-tap window has passed, 300 ms
+  // later; the overlay comes back as the finger lands instead.
+  void _onPointerDown(PointerDownEvent _) {
+    _shownOnDown = !_visible;
+    if (_shownOnDown) {
+      _settling = true;
+      _setVisible(true);
+    } else {
+      // A second touch inside the window has already reached this layer.
+      _settle();
+    }
+  }
+
+  void _settle() {
+    if (_settling) setState(() => _settling = false);
+  }
+
+  void _onTap() {
+    _settle();
+    if (_shownOnDown) {
+      _shownOnDown = false;
+      return;
+    }
+    _setVisible(false);
+  }
+
+  // The icon turns at once; the player's report settles it.
   void _togglePlayback() {
-    unawaited(widget.player.playOrPause());
+    final want = !_shownPlaying;
+    setState(() => _pendingPlaying = want);
+    unawaited(
+      widget.player.playOrPause().catchError((Object _) {
+        if (mounted) setState(() => _pendingPlaying = null);
+      }),
+    );
     _restartTimer();
   }
 
@@ -143,7 +198,9 @@ class _PlayerControlsState extends State<PlayerControls> {
   void _skip(Duration step) => _seekTo(_position + step);
 
   void _onDoubleTap() {
+    _settle();
     final width = context.size?.width ?? 0;
+    AppHaptics.select();
     _skip(_tapX < width / 2 ? -_seekStep : _seekStep);
   }
 
@@ -157,21 +214,27 @@ class _PlayerControlsState extends State<PlayerControls> {
       children: [
         widget.child,
         ExcludeSemantics(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _toggle,
-            onDoubleTapDown: (details) => _tapX = details.localPosition.dx,
-            onDoubleTap: _onDoubleTap,
+          child: Listener(
+            onPointerDown: _onPointerDown,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _onTap,
+              onTapCancel: _settle,
+              onDoubleTapDown: (details) => _tapX = details.localPosition.dx,
+              onDoubleTap: _onDoubleTap,
+              onDoubleTapCancel: _settle,
+            ),
           ),
         ),
         IgnorePointer(
-          ignoring: !_visible,
+          ignoring: !_visible || _settling,
           child: ExcludeSemantics(
             excluding: !_visible,
+            // In quickly, out unhurried.
             child: AnimatedOpacity(
               opacity: _visible ? 1 : 0,
-              duration: context.motion(_fade),
-              curve: Curves.easeOut,
+              duration: context.motion(_visible ? Motion.fast : Motion.medium),
+              curve: _visible ? Motion.enter : Motion.exit,
               child: _overlay(context),
             ),
           ),
@@ -229,16 +292,25 @@ class _PlayerControlsState extends State<PlayerControls> {
 
   // The filled button's icon is the one colour the light theme takes from the
   // accent, so it reads primaryIcon, not onPrimary.
-  Widget _playButton(AppTokens tokens) => IconButton.filled(
-    tooltip: _playing ? 'Pause' : 'Play',
-    onPressed: _togglePlayback,
-    style: IconButton.styleFrom(fixedSize: Size.square(_playSize.r)),
-    icon: AppIcon(
-      _playing ? Assets.icons.pause : Assets.icons.play,
-      size: _playIcon.r,
-      color: tokens.primaryIcon,
-    ),
-  );
+  Widget _playButton(AppTokens tokens) {
+    final playing = _shownPlaying;
+    return IconButton.filled(
+      tooltip: playing ? 'Pause' : 'Play',
+      onPressed: _togglePlayback,
+      style: IconButton.styleFrom(fixedSize: Size.square(_playSize.r)),
+      icon: AppFadeSwitcher(
+        spec: _playSwap,
+        scaleFrom: .6,
+        alignment: Alignment.center,
+        child: AppIcon(
+          key: ValueKey(playing),
+          playing ? Assets.icons.pause : Assets.icons.play,
+          size: _playIcon.r,
+          color: tokens.primaryIcon,
+        ),
+      ),
+    );
+  }
 
   Widget _bottomBar(BuildContext context) {
     final tokens = context.tokens;

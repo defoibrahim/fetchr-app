@@ -47,6 +47,27 @@ class LibraryNotifier extends AsyncNotifier<List<LibraryItem>> {
     return ref.read(deleteLibraryItemsUseCaseProvider)(item.uri);
   }
 
+  /// Deletes [items] one after the other, with no Undo. It stops at the first
+  /// file that fails or that the user keeps in the system dialog; that file
+  /// and the ones after it come back.
+  // ponytail: one native call per file, so files Fetchr does not own each
+  // ask on their own; a batch delete request if that turns up.
+  Future<Result<bool>> deleteAll(List<LibraryItem> items) async {
+    final delete = ref.read(deleteLibraryItemsUseCaseProvider);
+    _hidden = {..._hidden, for (final item in items) item.uri};
+    _publish();
+    for (final (index, item) in items.indexed) {
+      final result = await delete(item.uri);
+      if (result case Ok(value: true)) continue;
+      _hidden = _hidden.difference({
+        for (final kept in items.skip(index)) kept.uri,
+      });
+      _publish();
+      return result;
+    }
+    return const Ok(true);
+  }
+
   Future<Result<void>> share(LibraryItem item) =>
       ref.read(shareLibraryItemUseCaseProvider)(item);
 

@@ -47,18 +47,22 @@ void main() {
       testWidgets('full: surface, border, radius and padding', (tester) async {
         await pump(tester, data());
 
-        final box = tester.widget<DecoratedBox>(
+        final material = tester.widget<Material>(
           find
               .descendant(
                 of: find.byType(ErrorCard),
-                matching: find.byType(DecoratedBox),
+                matching: find.byType(Material),
               )
               .first,
         );
-        final decoration = box.decoration as BoxDecoration;
-        expect(decoration.color, tokens.errorSurface);
-        expect(decoration.border, Border.all(color: tokens.errorBorder));
-        expect(decoration.borderRadius, BorderRadius.circular(18.r));
+        expect(material.color, tokens.errorSurface);
+        expect(
+          material.shape,
+          RoundedRectangleBorder(
+            side: BorderSide(color: tokens.errorBorder),
+            borderRadius: BorderRadius.circular(18.r),
+          ),
+        );
         final card = tester.getRect(find.byType(ErrorCard));
         final tile = tester.getRect(
           find.ancestor(
@@ -319,80 +323,6 @@ void main() {
         expect(tester.takeException(), isNull);
         final text = tester.getRect(find.text('Night drive, no music'));
         expect(text.width, greaterThanOrEqualTo(64.w - 0.01));
-      });
-
-      testWidgets('appears with a fade and a size change, then settles', (
-        tester,
-      ) async {
-        await tester.pumpWidget(
-          themed(
-            Align(
-              alignment: Alignment.topLeft,
-              child: ErrorCard(data: data()),
-            ),
-            theme: theme,
-          ),
-        );
-        await tester.pump(const Duration(milliseconds: 50));
-
-        final partial = tester.widget<Opacity>(
-          find.descendant(
-            of: find.byType(ErrorCard),
-            matching: find.byType(Opacity),
-          ),
-        );
-        expect(partial.opacity, lessThan(1));
-
-        await tester.pump(const Duration(milliseconds: 200));
-        final settled = tester.widget<Opacity>(
-          find.descendant(
-            of: find.byType(ErrorCard),
-            matching: find.byType(Opacity),
-          ),
-        );
-        expect(settled.opacity, 1);
-      });
-
-      testWidgets('compact rows do not replay the entrance', (tester) async {
-        await tester.pumpWidget(
-          themed(
-            Align(
-              alignment: Alignment.topLeft,
-              child: ErrorCard(data: data(), layout: ErrorCardLayout.compact),
-            ),
-            theme: theme,
-          ),
-        );
-
-        expect(
-          find.descendant(
-            of: find.byType(ErrorCard),
-            matching: find.byType(Opacity),
-          ),
-          findsNothing,
-        );
-      });
-
-      testWidgets('reduce motion shows it at once', (tester) async {
-        reduceMotion(tester);
-        await tester.pumpWidget(
-          themed(
-            Align(
-              alignment: Alignment.topLeft,
-              child: ErrorCard(data: data()),
-            ),
-            theme: theme,
-          ),
-        );
-
-        expect(
-          find.descendant(
-            of: find.byType(ErrorCard),
-            matching: find.byType(Opacity),
-          ),
-          findsNothing,
-        );
-        expect(find.text('No internet connection'), findsOneWidget);
       });
     });
   }

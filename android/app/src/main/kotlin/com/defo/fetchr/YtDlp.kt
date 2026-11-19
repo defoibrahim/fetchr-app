@@ -66,6 +66,10 @@ object YtDlp {
     private const val KEY_AUTO_UPDATE = "ytdlp_auto_update"
     private const val STARTUP_WAIT_MS = 5_000L
 
+    // Bump when android/app/ffmpeg-16k changes, so installed apps unpack the patched ffmpeg zip again.
+    private const val FFMPEG_PKG_REV = 1
+    private const val KEY_FFMPEG_PKG_REV = "ffmpeg_pkg_rev"
+
     val ready: CompletableDeferred<Unit> = CompletableDeferred()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -79,7 +83,11 @@ object YtDlp {
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 YoutubeDL.getInstance().init(app)
+                val prefs = NativePrefs.prefs(app)
+                val ffmpegCurrent = prefs.getInt(KEY_FFMPEG_PKG_REV, 0) == FFMPEG_PKG_REV
+                if (!ffmpegCurrent) forgetFfmpegPackage(app)
                 FFmpeg.getInstance().init(app)
+                if (!ffmpegCurrent) prefs.edit().putInt(KEY_FFMPEG_PKG_REV, FFMPEG_PKG_REV).apply()
                 Aria2c.getInstance().init(app)
             } catch (t: Throwable) {
                 Log.e(TAG, "yt-dlp init failed", t)
@@ -91,6 +99,13 @@ object YtDlp {
         }
         startupUpdate = job
         job.start()
+    }
+
+    // youtubedl-android unpacks ffmpeg again only when this key, the zip's byte size, changes. The patched zip's size
+    // differs anyway; dropping the key makes it certain. The library then deletes the old folder itself, symlinks
+    // included. Same SharedPreferences instance as the library's, so commit() is seen by FFmpeg.init.
+    private fun forgetFfmpegPackage(app: Application) {
+        app.getSharedPreferences("youtubedl-android", Context.MODE_PRIVATE).edit().remove("ffmpegLibVersion").commit()
     }
 
     suspend fun <T> run(block: () -> T): T {

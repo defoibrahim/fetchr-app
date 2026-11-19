@@ -397,6 +397,8 @@ void main() {
     semanticsTest('Home names Clear URL', (tester) async {
       await _pumpAt(tester, _phone);
       await typeUrl(tester, clipUrl);
+      // Paste cross-fades into Clear.
+      await tester.pump(const Duration(milliseconds: 200));
 
       expectNamed(tester, ['Clear URL']);
     });

@@ -7,6 +7,7 @@ import '../../../../../core/theme/app_spacing.dart';
 import '../../../../../core/theme/theme.dart';
 import '../../../../../core/utils/scale.dart';
 import '../../../../../core/widgets/app_button.dart';
+import '../../../../../core/widgets/app_fade_switcher.dart';
 import '../../../../../core/widgets/app_icon_button.dart';
 import '../../../../../core/widgets/app_progress_bar.dart';
 import '../../../../../core/widgets/dashed_border.dart';
@@ -30,6 +31,8 @@ class DownloadCard extends StatelessWidget {
     required this.onCancel,
     required this.onRestart,
     required this.onRemove,
+    this.settling = false,
+    this.saved = false,
   }) : assert(
          _isCardState(task.cardState),
          'DownloadCard shows live and cancelled tasks, not ${task.status}',
@@ -42,6 +45,17 @@ class DownloadCard extends StatelessWidget {
   final VoidCallback onRestart;
   final VoidCallback onRemove;
 
+  /// The task shows a pause, resume or cancel native has not confirmed yet.
+  /// Its buttons take no taps until it has, without greying out: the state
+  /// already changed on screen.
+  final bool settling;
+
+  /// The task has just finished: the card holds a moment with a full bar and
+  /// "Saved" before its Done row takes over, and takes no taps meanwhile.
+  final bool saved;
+
+  static void _wait() {}
+
   static bool _isCardState(DownloadCardState state) => switch (state) {
     DownloadCardState.queued ||
     DownloadCardState.failed ||
@@ -52,14 +66,20 @@ class DownloadCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = task.cardState;
+    VoidCallback tap(VoidCallback action) => settling || saved ? _wait : action;
     return state == DownloadCardState.cancelled
-        ? _CancelledCard(task: task, onRestart: onRestart, onRemove: onRemove)
+        ? _CancelledCard(
+            task: task,
+            onRestart: tap(onRestart),
+            onRemove: tap(onRemove),
+          )
         : _LiveCard(
             task: task,
             state: state,
-            onPause: onPause,
-            onResume: onResume,
-            onCancel: onCancel,
+            saved: saved,
+            onPause: tap(onPause),
+            onResume: tap(onResume),
+            onCancel: tap(onCancel),
           );
   }
 }
@@ -68,6 +88,7 @@ class _LiveCard extends StatelessWidget {
   const _LiveCard({
     required this.task,
     required this.state,
+    required this.saved,
     required this.onPause,
     required this.onResume,
     required this.onCancel,
@@ -75,6 +96,7 @@ class _LiveCard extends StatelessWidget {
 
   final DownloadTask task;
   final DownloadCardState state;
+  final bool saved;
   final VoidCallback onPause;
   final VoidCallback onResume;
   final VoidCallback onCancel;
@@ -83,12 +105,14 @@ class _LiveCard extends StatelessWidget {
 
   /// Null shows the sliding segment: nothing to measure while starting or
   /// merging, or when the size is unknown. An MP3 conversion is measured.
-  double? get _value => switch (state) {
-    DownloadCardState.downloading ||
-    DownloadCardState.merging => task.progress >= 0 ? task.progress : null,
-    DownloadCardState.paused => math.max(task.progress, 0),
-    _ => null,
-  };
+  double? get _value => saved
+      ? 1
+      : switch (state) {
+          DownloadCardState.downloading || DownloadCardState.merging =>
+            task.progress >= 0 ? task.progress : null,
+          DownloadCardState.paused => math.max(task.progress, 0),
+          _ => null,
+        };
 
   @override
   Widget build(BuildContext context) {
@@ -111,20 +135,26 @@ class _LiveCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   spacing: Gap.sm.w,
                   children: [
-                    if (_paused)
-                      AppIconButton(
-                        icon: Assets.icons.play,
-                        tooltip: 'Resume download',
-                        onPressed: onResume,
-                        bordered: true,
-                      )
-                    else
-                      AppIconButton(
-                        icon: Assets.icons.pause,
-                        tooltip: 'Pause download',
-                        onPressed: onPause,
-                        bordered: true,
-                      ),
+                    AppFadeSwitcher(
+                      spec: Motion.fade,
+                      scaleFrom: .8,
+                      alignment: Alignment.center,
+                      child: _paused
+                          ? AppIconButton(
+                              key: const ValueKey('resume'),
+                              icon: Assets.icons.play,
+                              tooltip: 'Resume download',
+                              onPressed: onResume,
+                              bordered: true,
+                            )
+                          : AppIconButton(
+                              key: const ValueKey('pause'),
+                              icon: Assets.icons.pause,
+                              tooltip: 'Pause download',
+                              onPressed: onPause,
+                              bordered: true,
+                            ),
+                    ),
                     AppIconButton(
                       icon: Assets.icons.close,
                       tooltip: 'Cancel download',
@@ -138,16 +168,33 @@ class _LiveCard extends StatelessWidget {
             AppProgressBar(
               value: _value,
               color: _paused ? tokens.textMuted : null,
-              semanticsLabel: _paused
+              semanticsLabel: saved
+                  ? 'Download saved'
+                  : _paused
                   ? 'Download paused'
                   : stage ?? 'Download progress',
             ),
-            if (_paused)
-              _StatLine(text: task.pausedText)
-            else if (stage != null)
-              _StageLine(stage: stage, percent: task.stagePercent)
-            else
-              _Stats(task: task),
+            // Keyed by what the line says, not its numbers, so a tick only
+            // repaints it.
+            AppFadeSwitcher(
+              spec: Motion.fade,
+              scaleFrom: 1,
+              alignment: AlignmentDirectional.topStart,
+              child: saved
+                  ? const _StatLine(key: ValueKey('saved'), text: 'Saved')
+                  : _paused
+                  ? _StatLine(
+                      key: const ValueKey('paused'),
+                      text: task.pausedText,
+                    )
+                  : stage != null
+                  ? _StageLine(
+                      key: ValueKey('stage:$stage'),
+                      stage: stage,
+                      percent: task.stagePercent,
+                    )
+                  : _Stats(key: const ValueKey('stats'), task: task),
+            ),
           ],
         ),
       ),
@@ -188,7 +235,7 @@ class _Title extends StatelessWidget {
 }
 
 class _StatLine extends StatelessWidget {
-  const _StatLine({required this.text});
+  const _StatLine({super.key, required this.text});
 
   final String text;
 
@@ -202,7 +249,7 @@ class _StatLine extends StatelessWidget {
 
 /// What the task is doing, and how far an MP3 conversion has got.
 class _StageLine extends StatelessWidget {
-  const _StageLine({required this.stage, required this.percent});
+  const _StageLine({super.key, required this.stage, required this.percent});
 
   final String stage;
   final String? percent;
@@ -235,7 +282,7 @@ class _StageLine extends StatelessWidget {
 /// Percent and bytes on the left, speed and time on the right. Each side may
 /// wrap, so a large text size never overflows the card.
 class _Stats extends StatelessWidget {
-  const _Stats({required this.task});
+  const _Stats({super.key, required this.task});
 
   final DownloadTask task;
 

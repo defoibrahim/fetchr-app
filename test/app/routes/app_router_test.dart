@@ -20,6 +20,7 @@ import 'package:grabby/modules/library/presentation/views/library_view.dart';
 import 'package:grabby/modules/settings/presentation/views/settings_view.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../core/widgets/widget_harness.dart';
 import '../../support/fake_app.dart';
 import '../../support/fixtures.dart';
 
@@ -117,6 +118,42 @@ void main() {
     });
   });
 
+  group('transitions', () {
+    // go_router 18 would hand out NoTransitionPages, which never animate.
+    Animation<double> pushed(WidgetTester tester) =>
+        ModalRoute.of(tester.element(find.byType(PlaylistView)))!.animation!;
+
+    Future<void> push(FakeApp app) async => unawaited(
+      app.router.push(AppRoutes.playlist, extra: mediaInfo(isPlaylist: true)),
+    );
+
+    testWidgets('a pushed route plays the theme transition', (tester) async {
+      final app = await pumpFakeApp(tester);
+      await push(app);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(pushed(tester).value, inExclusiveRange(0, 1));
+      expect(navBar, findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(pushed(tester).value, 1);
+      expect(navBar, findsNothing);
+    });
+
+    testWidgets('reduce motion: a pushed route lands on the next frame', (
+      tester,
+    ) async {
+      reduceMotion(tester);
+      final app = await pumpFakeApp(tester);
+      await push(app);
+      await tester.pump();
+      await tester.pump();
+
+      expect(pushed(tester).value, 1);
+      expect(navBar, findsNothing);
+    });
+  });
+
   group('playlist', () {
     testWidgets('with a MediaInfo extra shows PlaylistView over the shell', (
       tester,
@@ -161,9 +198,10 @@ void main() {
       final app = await pumpFakeApp(tester);
 
       app.router.go(AppRoutes.gallery);
-      // Not pumpAndSettle: the gallery's spinners never stop.
+      // Not pumpAndSettle: the gallery's spinners never stop. Past the
+      // route's 450 ms transition.
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.byType(GalleryView), findsOneWidget);
       expect(navBar, findsNothing);

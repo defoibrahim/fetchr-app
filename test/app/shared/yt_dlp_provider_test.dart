@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:grabby/app/di/core_providers.dart';
 import 'package:grabby/app/shared/domain/entities/yt_dlp_status.dart';
 import 'package:grabby/app/shared/yt_dlp_provider.dart';
 import 'package:grabby/core/errors/failure.dart';
 import 'package:grabby/core/errors/result.dart';
+import 'package:grabby/core/platform/platform_traits.dart';
 import 'package:grabby/modules/settings/di/settings_providers.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -22,10 +24,16 @@ void main() {
 
   YtDlpNotifier notifier() => container.read(ytDlpProvider.notifier);
 
-  void open(Result<YtDlpStatus> status) {
+  void open(
+    Result<YtDlpStatus> status, {
+    PlatformTraits traits = PlatformTraits.android,
+  }) {
     when(() => repository.status()).thenAnswer((_) async => status);
     container = ProviderContainer(
-      overrides: [ytDlpRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        ytDlpRepositoryProvider.overrideWithValue(repository),
+        platformTraitsProvider.overrideWithValue(traits),
+      ],
     );
   }
 
@@ -72,6 +80,107 @@ void main() {
 
       expect(state().hasValue, isTrue);
       verify(() => repository.status()).called(1);
+    });
+  });
+
+  group("platform traits keep Android's copy", () {
+    test('a new version replaces the status at once', () async {
+      open(const Ok(loaded));
+      await settle();
+      when(
+        () => repository.update(),
+      ).thenAnswer((_) async => const Ok(updated));
+
+      await notifier().updateYtDlp();
+
+      expect(
+        state().requireValue,
+        const YtDlpState(updated, phase: YtDlpUpdatePhase.done),
+      );
+      expect(state().requireValue.pendingVersion, isNull);
+    });
+  });
+
+  group('iOS traits', () {
+    final checked = DateTime.utc(2026, 11, 15);
+
+    test('a new version is pending: the running status stays', () async {
+      open(const Ok(loaded), traits: PlatformTraits.ios);
+      await settle();
+      when(() => repository.update()).thenAnswer(
+        (_) async => Ok(
+          YtDlpStatus(
+            version: '2026.10.14',
+            checkedAt: checked,
+            autoUpdate: true,
+          ),
+        ),
+      );
+
+      await notifier().updateYtDlp();
+
+      expect(
+        state().requireValue,
+        YtDlpState(
+          YtDlpStatus(
+            version: '2026.10.01',
+            checkedAt: checked,
+            autoUpdate: true,
+          ),
+          phase: YtDlpUpdatePhase.done,
+          pendingVersion: '2026.10.14',
+        ),
+      );
+    });
+
+    test('the running version back is up to date, nothing pending', () async {
+      open(const Ok(loaded), traits: PlatformTraits.ios);
+      await settle();
+      when(() => repository.update()).thenAnswer((_) async => const Ok(loaded));
+
+      await notifier().updateYtDlp();
+
+      expect(
+        state().requireValue,
+        const YtDlpState(loaded, phase: YtDlpUpdatePhase.done),
+      );
+    });
+
+    test('a failure after a pending update keeps it pending', () async {
+      open(const Ok(loaded), traits: PlatformTraits.ios);
+      await settle();
+      when(
+        () => repository.update(),
+      ).thenAnswer((_) async => const Ok(updated));
+      await notifier().updateYtDlp();
+      when(
+        () => repository.update(),
+      ).thenAnswer((_) async => const Err<YtDlpStatus>(NetworkFailure()));
+
+      await notifier().updateYtDlp();
+
+      expect(
+        state().requireValue,
+        const YtDlpState(loaded, pendingVersion: '2026.10.14'),
+      );
+    });
+
+    test('with no running status read, the update is taken as is', () async {
+      open(
+        const Err<YtDlpStatus>(UnexpectedFailure()),
+        traits: PlatformTraits.ios,
+      );
+      await settle();
+      when(
+        () => repository.update(),
+      ).thenAnswer((_) async => const Ok(updated));
+
+      await notifier().updateYtDlp();
+
+      expect(
+        state().requireValue,
+        const YtDlpState(updated, phase: YtDlpUpdatePhase.done),
+      );
     });
   });
 

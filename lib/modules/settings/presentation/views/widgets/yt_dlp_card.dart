@@ -51,7 +51,8 @@ class YtDlpCard extends ConsumerWidget {
     final status = state?.status;
     final phase = state?.phase ?? YtDlpUpdatePhase.idle;
     final busy = phase == YtDlpUpdatePhase.busy;
-    final done = phase == YtDlpUpdatePhase.done;
+    // Installed is installed: a failed Check again still runs it next launch.
+    final pending = busy ? null : state?.pendingVersion;
 
     return SettingsSection(
       title: 'Download engine',
@@ -62,8 +63,10 @@ class YtDlpCard extends ConsumerWidget {
           children: [
             _StatusRow(
               version: _versionText(yt),
-              caption: ytDlpCaption(status, phase, DateTime.now()),
-              upToDate: done,
+              caption: pending == null
+                  ? ytDlpCaption(status, phase, DateTime.now())
+                  : ytDlpPendingCaption(pending),
+              upToDate: phase == YtDlpUpdatePhase.done && pending == null,
             ),
             AppButton(
               label: phase.actionLabel,

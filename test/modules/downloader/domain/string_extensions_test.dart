@@ -44,4 +44,28 @@ void main() {
       });
     });
   });
+
+  group('videoWithoutPlaylist', () {
+    const cases = <String, String?>{
+      'https://www.youtube.com/watch?v=abc&list=PL1':
+          'https://www.youtube.com/watch?v=abc',
+      'https://m.youtube.com/watch?list=PL1&v=abc&index=3&pp=x':
+          'https://m.youtube.com/watch?v=abc',
+      'https://music.youtube.com/watch?v=abc&list=RDabc':
+          'https://music.youtube.com/watch?v=abc',
+      'https://youtube.com/watch?v=abc&list=PL1':
+          'https://youtube.com/watch?v=abc',
+      'https://youtu.be/abc?list=PL1&si=x': 'https://youtu.be/abc',
+      'https://www.youtube.com/watch?v=abc': null,
+      'https://www.youtube.com/watch?v=abc&list=': null,
+      'https://www.youtube.com/playlist?list=PL1': null,
+      'https://www.youtube.com/watch?list=PL1': null,
+      'https://youtu.be/?list=PL1': null,
+      'https://example.com/watch?v=abc&list=PL1': null,
+      'https://notyoutube.com/watch?v=abc&list=PL1': null,
+    };
+    cases.forEach((input, expected) {
+      test(input, () => expect(input.videoWithoutPlaylist, expected));
+    });
+  });
 }

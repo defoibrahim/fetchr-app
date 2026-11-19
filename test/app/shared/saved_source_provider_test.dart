@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:grabby/app/shared/platform_traits_provider.dart';
 import 'package:grabby/app/shared/saved_source_provider.dart';
 import 'package:grabby/modules/downloader/di/downloader_providers.dart';
 import 'package:grabby/modules/downloader/domain/entities/download_task.dart';
@@ -17,12 +18,18 @@ void main() {
   late StreamController<List<DownloadTask>> tasks;
   late ProviderContainer container;
 
+  // A group's setUpAll runs before this file's setUp, so it can switch it.
+  var traits = PlatformTraits.android;
+
   setUp(() {
     tasks = StreamController<List<DownloadTask>>();
     final downloader = MockDownloaderRepository();
     when(downloader.watchTasks).thenAnswer((_) => tasks.stream);
     container = ProviderContainer(
-      overrides: [downloaderRepositoryProvider.overrideWithValue(downloader)],
+      overrides: [
+        downloaderRepositoryProvider.overrideWithValue(downloader),
+        platformTraitsProvider.overrideWithValue(traits),
+      ],
     );
     addTearDown(container.dispose);
     addTearDown(tasks.close);
@@ -89,6 +96,29 @@ void main() {
     ];
 
     expect(await sourceAfter(snapshot), 'youtube.com · Open Road Films');
+  });
+
+  group("platform traits keep Android's copy", () {
+    test('a converted video is from This phone', () async {
+      expect(
+        await sourceAfter([completed(url: 'content://media/picker/0/v/7')]),
+        'This phone · Open Road Films',
+      );
+    });
+  });
+
+  group('iOS traits', () {
+    setUpAll(() => traits = PlatformTraits.ios);
+    tearDownAll(() => traits = PlatformTraits.android);
+
+    test('a converted video is from This device', () async {
+      expect(
+        await sourceAfter([
+          completed(url: 'file:///picked/a/clip.mp4', uploader: null),
+        ]),
+        'This device',
+      );
+    });
   });
 
   test('follows the downloads as they change', () async {

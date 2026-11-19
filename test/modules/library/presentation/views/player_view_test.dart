@@ -6,6 +6,7 @@ import 'package:grabby/core/errors/failure.dart';
 import 'package:grabby/core/errors/result.dart';
 import 'package:grabby/core/utils/formatters.dart';
 import 'package:grabby/core/utils/scale.dart';
+import 'package:grabby/core/widgets/media_thumb.dart';
 import 'package:grabby/modules/downloader/domain/entities/download_task.dart';
 import 'package:grabby/modules/library/domain/entities/library_item.dart';
 import 'package:grabby/modules/library/presentation/formatters/library_item_formatter.dart';
@@ -48,6 +49,51 @@ void main() {
       await pumpPlayer(tester, videoItem);
 
       expect(find.byKey(videoKey), findsOneWidget);
+    });
+
+    double videoOpacity(WidgetTester tester) => tester
+        .widget<FadeTransition>(
+          find
+              .ancestor(
+                of: find.byKey(videoKey),
+                matching: find.byType(FadeTransition),
+              )
+              .first,
+        )
+        .opacity
+        .value;
+
+    testWidgets('the video fades in over black once the first frame comes', (
+      tester,
+    ) async {
+      await pumpPlayer(tester, videoItem);
+      expect(videoOpacity(tester), 0);
+
+      // The size arrives with the first frame.
+      await emit(tester, width, null);
+      expect(videoOpacity(tester), 0);
+      await emit(tester, width, 1920);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(videoOpacity(tester), inExclusiveRange(0, 1));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(videoOpacity(tester), 1);
+    });
+
+    testWidgets('a player that already has a frame shows it at once', (
+      tester,
+    ) async {
+      when(() => player.state).thenReturn(const PlayerState(width: 1920));
+      await pumpPlayer(tester, videoItem);
+      expect(videoOpacity(tester), 1);
+    });
+
+    testWidgets('reduce motion: the first frame shows without a fade', (
+      tester,
+    ) async {
+      reduceMotion(tester);
+      await pumpPlayer(tester, videoItem);
+      await emit(tester, width, 1920);
+      expect(videoOpacity(tester), 1);
     });
 
     testWidgets('an audio file shows the audio tile instead', (tester) async {
@@ -399,6 +445,43 @@ void main() {
       verifyNever(() => libraryRepository.delete(any()));
     });
 
+    for (final (kind, item) in [('song', songItem), ('video', videoItem)]) {
+      testWidgets(
+        'a $kind keeps its picture and details while the page leaves',
+        (tester) async {
+          var surfaces = 0;
+          await pumpPlayer(
+            tester,
+            item,
+            animatedRoute: true,
+            onSurface: () => surfaces++,
+          );
+          final audio = find.byType(AudioTile).evaluate().length;
+          final share = find.text('Share').evaluate().length;
+          final surfacesBefore = surfaces;
+
+          await tapDelete(tester);
+          await tester.tap(
+            find.descendant(
+              of: find.byType(Dialog),
+              matching: find.text('Delete'),
+            ),
+          );
+          await tester.pump();
+          // Mid-exit: the item is already hidden from the Library.
+          await tester.pump(const Duration(milliseconds: 100));
+
+          expect(find.byType(PlayerView), findsOneWidget);
+          expect(find.byType(AudioTile), findsNWidgets(audio));
+          expect(find.text('Share'), findsNWidgets(share));
+          expect(surfaces, surfacesBefore);
+
+          await tester.pumpAndSettle();
+          expect(find.byType(PlayerView), findsNothing);
+        },
+      );
+    }
+
     testWidgets('Delete leaves the player and offers Undo', (tester) async {
       await pumpPlayer(tester, videoItem);
 
@@ -458,6 +541,83 @@ void main() {
       await confirm(tester);
 
       expect(find.byType(PlayerView), findsNothing);
+    });
+  });
+
+  group('in the background', () {
+    // resumed -> inactive -> hidden is how Android leaves the app.
+    Future<void> hide(WidgetTester tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      await tester.pump();
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+    }
+
+    testWidgets('a video pauses', (tester) async {
+      await pumpPlayer(tester, videoItem);
+
+      await hide(tester);
+
+      verify(() => player.pause()).called(1);
+    });
+
+    testWidgets('an audio file keeps playing', (tester) async {
+      await pumpPlayer(tester, songItem);
+
+      await hide(tester);
+
+      verifyNever(() => player.pause());
+    });
+
+    group('a file the Library does not list', () {
+      final elsewhere = libraryItem(
+        uri: 'content://media/external/audio/media/9',
+        name: 'Another folder.mp3',
+      );
+
+      void stubTracks(List<VideoTrack> video) => when(
+        () => player.state,
+      ).thenReturn(PlayerState(tracks: Tracks(video: video)));
+
+      testWidgets('pauses when mpv found a picture', (tester) async {
+        stubTracks([
+          VideoTrack.auto(),
+          VideoTrack.no(),
+          const VideoTrack('1', null, null),
+        ]);
+        await pumpPlayer(tester, elsewhere);
+
+        await hide(tester);
+
+        verify(() => player.pause()).called(1);
+      });
+
+      testWidgets('keeps a song with cover art playing', (tester) async {
+        stubTracks([
+          VideoTrack.auto(),
+          VideoTrack.no(),
+          const VideoTrack('1', null, null, albumart: true),
+        ]);
+        await pumpPlayer(tester, elsewhere);
+
+        await hide(tester);
+
+        verifyNever(() => player.pause());
+      });
+    });
+
+    testWidgets('a closed player no longer listens', (tester) async {
+      await pumpPlayer(tester, videoItem);
+      router.pop();
+      await tester.pumpAndSettle();
+
+      await hide(tester);
+
+      verifyNever(() => player.pause());
     });
   });
 

@@ -47,7 +47,7 @@ class ActionMenuItem {
 /// shape and shadow from `menuTheme` and `menuButtonTheme`; this adds the
 /// width and the placement. `builder` gets the controller, so an anchor can
 /// open the menu on tap or on a long press.
-class ActionMenu extends StatelessWidget {
+class ActionMenu extends StatefulWidget {
   const ActionMenu({super.key, required this.items, required this.builder});
 
   static const width = 176.0;
@@ -57,10 +57,24 @@ class ActionMenu extends StatelessWidget {
   builder;
 
   @override
+  State<ActionMenu> createState() => _ActionMenuState();
+}
+
+class _ActionMenuState extends State<ActionMenu> {
+  var _status = AnimationStatus.dismissed;
+
+  void _onStatus(AnimationStatus status) {
+    if (mounted && status != _status) setState(() => _status = status);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final menuWidth = width.w;
+    final menuWidth = ActionMenu.width.w;
     final error = context.tokens.error;
     return MenuAnchor(
+      // The panel grows and fades in; under reduce motion it just appears.
+      animated: !context.reduceMotion,
+      onAnimationStatusChanged: _onStatus,
       style: MenuStyle(
         fixedSize: WidgetStatePropertyAll(Size.fromWidth(menuWidth)),
         // Below the anchor, with the two end edges flush: the menu extends
@@ -71,9 +85,12 @@ class ActionMenu extends StatelessWidget {
       // Unconstrained, the panel is as wide as its widest row and ignores
       // the fixed width above.
       crossAxisUnconstrained: false,
-      builder: (context, controller, _) => builder(context, controller),
+      builder: (context, controller, _) => _MenuStatus(
+        status: _status,
+        child: widget.builder(context, controller),
+      ),
       menuChildren: [
-        for (final item in items)
+        for (final item in widget.items)
           MenuItemButton(
             onPressed: item.onSelected,
             leadingIcon: AppIcon(item.icon),
@@ -110,10 +127,29 @@ class MoreActionsDots extends StatelessWidget {
 
   final MenuController controller;
 
+  // A closing menu is still open until its fade ends; a tap then opens it
+  // again rather than closing it twice.
+  bool _opening(BuildContext context) =>
+      _MenuStatus.maybeOf(context)?.isForwardOrCompleted ?? controller.isOpen;
+
   @override
   Widget build(BuildContext context) => AppIconButton(
     icon: Assets.icons.moreVertical,
     tooltip: 'More actions',
-    onPressed: () => controller.isOpen ? controller.close() : controller.open(),
+    onPressed: () => _opening(context) ? controller.close() : controller.open(),
   );
+}
+
+/// Whether the [ActionMenu] above is opening, open, closing or closed.
+class _MenuStatus extends InheritedWidget {
+  const _MenuStatus({required this.status, required super.child});
+
+  final AnimationStatus status;
+
+  static AnimationStatus? maybeOf(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<_MenuStatus>()?.status;
+
+  // Read in a tap callback, never in build: nothing depends on it.
+  @override
+  bool updateShouldNotify(_MenuStatus oldWidget) => false;
 }

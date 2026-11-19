@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:grabby/app/di/core_providers.dart';
@@ -10,6 +11,7 @@ import 'package:grabby/core/theme/theme.dart';
 import 'package:grabby/core/utils/scale.dart';
 import 'package:grabby/modules/library/di/library_providers.dart';
 import 'package:grabby/modules/library/domain/entities/library_item.dart';
+import 'package:grabby/modules/library/presentation/views/library_playlist_view.dart';
 import 'package:grabby/modules/library/presentation/views/library_view.dart';
 import 'package:grabby/modules/library/presentation/views/widgets/library_card.dart';
 import 'package:mocktail/mocktail.dart';
@@ -65,6 +67,7 @@ Future<void> pumpLibrary(
   ValueListenable<bool>? ticking,
   Size size = designSize,
   TextDirection textDirection = TextDirection.ltr,
+  List<Override> overrides = const [],
 }) async {
   useView(tester, size);
   final router = GoRouter(
@@ -88,6 +91,11 @@ Future<void> pumpLibrary(
         },
       ),
       GoRoute(
+        path: AppRoutes.libraryPlaylist,
+        builder: (_, state) =>
+            LibraryPlaylistView(name: state.uri.queryParameters['name']!),
+      ),
+      GoRoute(
         path: AppRoutes.home,
         builder: (_, _) => const Scaffold(body: Text('home')),
       ),
@@ -99,6 +107,7 @@ Future<void> pumpLibrary(
       overrides: [
         libraryRepositoryProvider.overrideWithValue(repository),
         appStorageProvider.overrideWithValue(MemoryStorage()),
+        ...overrides,
       ],
       child: ScaleScope(
         child: MaterialApp.router(
@@ -112,8 +121,11 @@ Future<void> pumpLibrary(
       ),
     ),
   );
-  // The first frame starts the load; the second shows its result.
+  // The first frame starts the load; the second shows its result, which
+  // cross-fades in over the spinner.
   await tester.pump();
+  await tester.pump();
+  await tester.pump(Motion.swap.duration);
   await tester.pump();
 }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_motion.dart';
 import '../theme/app_spacing.dart';
 import '../theme/theme_extensions.dart';
 import '../widgets/sheet_drag_handle.dart';
@@ -11,9 +12,6 @@ const _grabberTop = 10.0;
 const _grabberBottom = 4.0;
 // The grabber's own height, which the dialog does not draw.
 const _grabberHeight = 4.0;
-const _enter = Duration(milliseconds: 300);
-const _exit = Duration(milliseconds: 250);
-const _fade = Duration(milliseconds: 150);
 
 /// A bottom sheet on a phone, a [Breakpoints.dialogWidth] dialog from
 /// [Breakpoints.medium] wide, except in a window shorter than
@@ -42,8 +40,8 @@ Future<T?> _showSheet<T>(BuildContext context, Widget child) {
     useSafeArea: true,
     useRootNavigator: true,
     sheetAnimationStyle: AnimationStyle(
-      duration: context.motion(_enter),
-      reverseDuration: context.motion(_exit),
+      duration: context.motion(Motion.emphasis),
+      reverseDuration: context.motion(Motion.medium),
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     ),
@@ -86,8 +84,8 @@ Future<T?> _showDialog<T>(BuildContext context, Widget child) {
     context: context,
     useRootNavigator: true,
     animationStyle: AnimationStyle(
-      duration: context.motion(_fade),
-      reverseDuration: context.motion(_fade),
+      duration: context.motion(Motion.fast),
+      reverseDuration: context.motion(Motion.fast),
     ),
     builder: (dialogContext) => Dialog(
       clipBehavior: Clip.antiAlias,

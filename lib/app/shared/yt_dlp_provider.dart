@@ -5,21 +5,34 @@ import '../../core/errors/result.dart';
 import '../../core/usecase/base_use_case.dart';
 import '../../modules/settings/di/settings_providers.dart';
 import 'domain/entities/yt_dlp_status.dart';
+import 'platform_traits_provider.dart';
 
 enum YtDlpUpdatePhase { idle, busy, done }
 
 class YtDlpState extends Equatable {
-  const YtDlpState(this.status, {this.phase = YtDlpUpdatePhase.idle});
+  const YtDlpState(
+    this.status, {
+    this.phase = YtDlpUpdatePhase.idle,
+    this.pendingVersion,
+  });
 
   /// Null while an update runs after a failed status read.
   final YtDlpStatus? status;
   final YtDlpUpdatePhase phase;
 
+  /// The version an update just installed for the next launch, when it is not
+  /// the one running. Only a platform whose update needs a restart sets it.
+  final String? pendingVersion;
+
   YtDlpState copyWith({YtDlpStatus? status, YtDlpUpdatePhase? phase}) =>
-      YtDlpState(status ?? this.status, phase: phase ?? this.phase);
+      YtDlpState(
+        status ?? this.status,
+        phase: phase ?? this.phase,
+        pendingVersion: pendingVersion,
+      );
 
   @override
-  List<Object?> get props => [status, phase];
+  List<Object?> get props => [status, phase, pendingVersion];
 }
 
 class YtDlpNotifier extends AsyncNotifier<YtDlpState> {
@@ -47,13 +60,34 @@ class YtDlpNotifier extends AsyncNotifier<YtDlpState> {
     if (!ref.mounted) return result;
     switch (result) {
       case Ok(:final value):
-        state = AsyncData(YtDlpState(value, phase: YtDlpUpdatePhase.done));
+        state = AsyncData(_updated(current?.status, value));
       case Err() when current == null:
         ref.invalidateSelf();
       case Err():
         state = AsyncData(current!.copyWith(phase: YtDlpUpdatePhase.idle));
     }
     return result;
+  }
+
+  // Where an update runs only from the next launch, the version in use stays
+  // the running one and the new one waits.
+  YtDlpState _updated(YtDlpStatus? running, YtDlpStatus installed) {
+    final version = installed.version;
+    if (!ref.read(platformTraitsProvider).updateNeedsRestart ||
+        running == null ||
+        version == null ||
+        version == running.version) {
+      return YtDlpState(installed, phase: YtDlpUpdatePhase.done);
+    }
+    return YtDlpState(
+      YtDlpStatus(
+        version: running.version,
+        checkedAt: installed.checkedAt,
+        autoUpdate: installed.autoUpdate,
+      ),
+      phase: YtDlpUpdatePhase.done,
+      pendingVersion: version,
+    );
   }
 
   /// Optimistic: the switch flips at once and flips back on `Err`.

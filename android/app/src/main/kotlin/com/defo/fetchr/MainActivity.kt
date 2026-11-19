@@ -74,7 +74,11 @@ class MainActivity : FlutterActivity() {
         DownloadsStreamHandler.register(messenger, downloadsStream)
     }
 
+    // Runs while the engine is still attached, before FlutterEngine.destroy detaches FlutterJNI.
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        // Players first, so they stop drawing before their surfaces are released.
+        MpvGuard.players.detachAll()
+        VideoSurfaces.release(flutterEngine)
         val messenger = flutterEngine.dartExecutor.binaryMessenger
         FetchrHostApi.setUp(messenger, null)
         // The generated code has no unregister, and removing the handler does not call onCancel.

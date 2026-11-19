@@ -5,10 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/shared/domain/entities/quality.dart';
 import '../../../../app/shared/download_prefs_provider.dart';
+import '../../../../app/shared/platform_traits_provider.dart';
 import '../../../../core/errors/result.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/haptics.dart';
 import '../../../../core/utils/scale.dart';
 import '../../../../core/widgets/app_back_button.dart';
 import '../../../../core/widgets/app_snackbar.dart';
@@ -62,6 +64,7 @@ class _PlaylistViewState extends ConsumerState<PlaylistView> {
     if (!mounted) return;
     switch (result) {
       case Ok(:final value):
+        AppHaptics.confirm();
         Navigator.of(context).pop(value);
       case Err():
         setState(() => _busy = false);
@@ -76,6 +79,10 @@ class _PlaylistViewState extends ConsumerState<PlaylistView> {
     final info = widget.info;
     final gutter = context.gutter;
     final folder = ref.watch(downloadPrefsProvider.select((p) => p.folder));
+    final site = siteOf(
+      info.url,
+      deviceWord: ref.watch(platformTraitsProvider).deviceWord,
+    );
     final count = _selection.count;
     final indexWidth = math.max(
       _indexMinWidth,
@@ -85,7 +92,7 @@ class _PlaylistViewState extends ConsumerState<PlaylistView> {
     return Scaffold(
       bottomNavigationBar: PlaylistBottomBar(
         gutter: gutter,
-        caption: 'Saves to ${_quality.savePath(folder)}',
+        caption: 'Saves to ${_quality.savePath(folder, playlist: info.title)}',
         label: 'Download ${plural(count, 'video')}',
         onPressed: count == 0 || _busy ? null : _download,
       ),
@@ -100,21 +107,7 @@ class _PlaylistViewState extends ConsumerState<PlaylistView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        Gap.sm.w,
-                        Gap.sm.h,
-                        gutter,
-                        Gap.xs.h,
-                      ),
-                      child: Row(
-                        spacing: Gap.xs.w,
-                        children: [
-                          const AppBackButton(),
-                          Text('Playlist', style: type.button),
-                        ],
-                      ),
-                    ),
+                    const AppBackHeader('Playlist'),
                     Padding(
                       padding: EdgeInsets.fromLTRB(gutter, Gap.sm.h, gutter, 0),
                       child: Column(
@@ -122,7 +115,7 @@ class _PlaylistViewState extends ConsumerState<PlaylistView> {
                         spacing: _metaGap.h,
                         children: [
                           Text(
-                            '${siteOf(info.url)} · ${plural(_total, 'video')}',
+                            '$site · ${plural(_total, 'video')}',
                             style: type.mono.copyWith(color: tokens.textMuted),
                             // A host reads left to right in any locale.
                             textDirection: TextDirection.ltr,

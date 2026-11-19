@@ -62,17 +62,18 @@ final _hostPrefix = RegExp(r'^(?:www|m)\.');
 String plural(int n, String noun) => '$n ${n == 1 ? noun : '${noun}s'}';
 
 /// "youtube.com · Uploader", or the site alone when there is no uploader.
-String sourceLine(String url, String? uploader) {
+String sourceLine(String url, String? uploader, {required String deviceWord}) {
   final who = uploader?.trim() ?? '';
-  return who.isEmpty ? siteOf(url) : '${siteOf(url)} · $who';
+  final site = siteOf(url, deviceWord: deviceWord);
+  return who.isEmpty ? site : '$site · $who';
 }
 
 /// The host of [url] without `www.` or `m.`, or [url] itself when it has none.
-/// A video converted from the device is "This phone".
-String siteOf(String url) {
+/// A video converted from the device is "This [deviceWord]".
+String siteOf(String url, {required String deviceWord}) {
   final parsed = Uri.tryParse(url);
   if (parsed?.scheme == 'content' || parsed?.scheme == 'file') {
-    return 'This phone';
+    return 'This $deviceWord';
   }
   final host = parsed?.host ?? '';
   return host.isEmpty ? url : host.replaceFirst(_hostPrefix, '');

@@ -46,7 +46,9 @@ extension DownloadTaskFormat on DownloadTask {
   String queuedText({int more = 0}) {
     final percent = _percent;
     if (percent > 0) return 'Queued again · resumes from $percent%';
-    return more > 0 ? 'Queued · $more more after this' : 'Queued';
+    if (more > 0) return 'Queued · $more more after this';
+    final place = playlistPlace;
+    return place == null ? 'Queued' : 'Queued · $place';
   }
 
   /// The copy table's short reason for a failed task.
@@ -62,13 +64,19 @@ extension DownloadTaskFormat on DownloadTask {
     _ => 'Download failed',
   };
 
-  /// "720p · MP4", or "720p · 3 of 18 in playlist".
+  /// "720p · MP4", or "720p · 3 of 18" for a playlist video.
   String get metaText {
+    final place = playlistPlace;
+    return place == null
+        ? request.quality.formatLabel
+        : '${request.quality.shortLabel} · $place';
+  }
+
+  /// "3 of 18", or null outside a playlist.
+  String? get playlistPlace {
     final index = request.playlistIndex;
     final count = request.playlistCount;
-    return index != null && count != null
-        ? '${request.quality.shortLabel} · $index of $count in playlist'
-        : request.quality.formatLabel;
+    return index != null && count != null ? '$index of $count' : null;
   }
 
   /// Bytes of a finished file: the total, else what was written.
@@ -78,7 +86,8 @@ extension DownloadTaskFormat on DownloadTask {
   String get doneMeta {
     final size = fileSize;
     return [
-      request.quality.savePath(request.folder),
+      // A file saved before native recorded the path went into the flat folder.
+      savedPath ?? request.quality.savePath(request.folder),
       if (size != null && size > 0) formatBytes(size),
     ].join(' · ');
   }
@@ -96,6 +105,9 @@ extension DownloadTaskFormat on DownloadTask {
     final size = totalBytes;
     return [label, container, if (size != null) formatBytes(size)].join(' · ');
   }
+
+  /// "64%", 0% while it is unknown.
+  String get percentText => '$_percent%';
 
   int get _percent => (progress.clamp(0.0, 1.0) * 100).round();
 

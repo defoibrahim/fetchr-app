@@ -11,11 +11,16 @@ const _iconTile = 40.0;
 const _icon = 20.0;
 const _chevron = 18.0;
 
-/// Home's second way in, beside the link: any video on the phone, picked
-/// with the system picker, becomes an MP3.
+/// Home's second way in, beside the link: any video on the device, picked
+/// with the system picker, becomes an MP3. [deviceWord] names the device.
 class ConvertVideoTile extends StatelessWidget {
-  const ConvertVideoTile({super.key, required this.onTap});
+  const ConvertVideoTile({
+    super.key,
+    required this.deviceWord,
+    required this.onTap,
+  });
 
+  final String deviceWord;
   final VoidCallback onTap;
 
   @override
@@ -66,7 +71,7 @@ class ConvertVideoTile extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        'Pick any video on your phone',
+                        'Pick any video on your $deviceWord',
                         style: type.caption.copyWith(color: tokens.textMuted),
                       ),
                     ],

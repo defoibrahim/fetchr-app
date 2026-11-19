@@ -32,6 +32,7 @@ class TaskCodecTest {
         errorCode: String? = null,
         errorMessage: String? = null,
         savedUri: String? = "content://media/external/video/media/42",
+        savedPath: String? = "Movies/Fetchr/Road trip",
         request: DownloadRequest = this.request,
         stage: TaskStage = TaskStage.PREPARING,
         downloadedBytes: Long? = null,
@@ -48,6 +49,7 @@ class TaskCodecTest {
         errorCode = errorCode,
         errorMessage = errorMessage,
         savedUri = savedUri,
+        savedPath = savedPath,
         createdAtMs = 1_760_000_000_123L,
         stage = stage,
         downloadedBytes = downloadedBytes,
@@ -212,6 +214,7 @@ class TaskCodecTest {
 
         assertEquals(TaskStatus.COMPLETED, decoded.status)
         assertEquals(TaskStage.PREPARING, decoded.stage)
+        assertNull(decoded.savedPath)
         assertNull(decoded.downloadedBytes)
         assertNull(decoded.totalBytes)
         assertNull(decoded.speedBytesPerSec)

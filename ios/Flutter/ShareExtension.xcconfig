@@ -1,0 +1,3 @@
+// The share extension takes Flutter's version numbers and the local signing team, never the Pods settings.
+#include "Generated.xcconfig"
+#include? "Signing.xcconfig"

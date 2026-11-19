@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
@@ -8,6 +9,7 @@ import '../../core/networking/api_constants.dart';
 import '../../core/networking/dio_client.dart';
 import '../../core/networking/network_info.dart';
 import '../../core/platform/fetchr_api.g.dart' show FetchrHostApi;
+import '../../core/platform/platform_traits.dart';
 import '../../core/services/storage/app_storage.dart';
 import '../../core/services/storage/token_store.dart';
 
@@ -58,3 +60,7 @@ final dioClientProvider = Provider<DioClient>(
 );
 
 final fetchrHostApiProvider = Provider<FetchrHostApi>((ref) => FetchrHostApi());
+
+final platformTraitsProvider = Provider<PlatformTraits>(
+  (ref) => PlatformTraits.of(defaultTargetPlatform),
+);

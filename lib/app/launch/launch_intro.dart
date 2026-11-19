@@ -40,6 +40,12 @@ const launchIntroSplashTimeout = Duration(milliseconds: 1200);
 @visibleForTesting
 const launchIntroOverlayKey = ValueKey('launch-intro-overlay');
 
+/// Whether the app opened on a route of its own, such as a notification's
+/// fetchr://app/downloads: the intro would cover that screen and find no Home
+/// header to land on, so the app starts without it.
+bool launchedOnDeepLink(String initialRoute) =>
+    initialRoute != Navigator.defaultRouteName;
+
 /// The colours of the native launch splash, which Android resolves from
 /// `values/colors.xml` and `values-night/colors.xml` by the system's
 /// brightness: the Home header tile in the default accent. A test keeps the
@@ -76,6 +82,7 @@ class _LaunchIntroState extends State<LaunchIntro>
   final _tileKey = GlobalKey();
   late final _controller = AnimationController(vsync: this);
   Rect? _target;
+  bool _started = false;
   bool _done = false;
 
   Duration get _flight => _target == null ? Duration.zero : launchIntroFlight;
@@ -103,12 +110,39 @@ class _LaunchIntroState extends State<LaunchIntro>
     } catch (e, s) {
       AppLogger.error('Could not wait for the native splash', e, s);
     }
-    if (!mounted) return;
+    // A tap or a shared link may have moved it on while it waited.
+    if (!mounted || _done || _started) return;
     if (context.reduceMotion) return _finish();
+    _start();
+    _play();
+  }
+
+  void _start() {
     _target = _targetRect();
     _controller.duration = launchIntroReveal + _flight + launchIntroFade;
-    // Never completes once disposed, so no mounted check is needed.
-    unawaited(_controller.forward().then((_) => _finish()));
+    _started = true;
+  }
+
+  // Never completes once disposed or stopped, so no mounted check is needed
+  // and a jump to the fade does not finish twice.
+  void _play() => unawaited(_controller.forward().then((_) => _finish()));
+
+  /// A tap: straight to the closing fade, with the tile already home, even
+  /// before the native splash has reported.
+  void _skipToFade() {
+    if (_done) return;
+    if (context.reduceMotion) return _finish();
+    if (!_started) _start();
+    final total = _controller.duration!.inMicroseconds;
+    final fade = (launchIntroReveal + _flight).inMicroseconds / total;
+    if (_controller.value >= fade) return;
+    _controller.value = fade;
+    _play();
+  }
+
+  /// A shared link opens a sheet the intro would cover: gone at once.
+  void _skip() {
+    if (!_done && mounted) _finish();
   }
 
   /// The header tile's rect in this widget's coordinates, or null when the
@@ -136,6 +170,7 @@ class _LaunchIntroState extends State<LaunchIntro>
   Widget build(BuildContext context) {
     return LaunchLogoTarget(
       tileKey: _tileKey,
+      skipIntro: _skip,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -172,42 +207,47 @@ class _LaunchIntroState extends State<LaunchIntro>
         ThemeData.estimateBrightnessForColor(background) == Brightness.dark
         ? Brightness.light
         : Brightness.dark;
-    return AbsorbPointer(
-      key: launchIntroOverlayKey,
-      child: ExcludeSemantics(
-        child: AnnotatedRegion(
-          value: systemBarsStyle(iconsOnBackground),
-          // The overlay sits above the Navigator, outside any screen's
-          // Material, so its text would get the debug underline without one.
-          child: Material(
-            type: MaterialType.transparency,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ColoredBox(color: background.withValues(alpha: 1 - fade)),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: centre.bottom + _taglineGap,
-                  child: _taglineLine(
-                    context,
-                    AppPalette.of(platform).text,
-                    1 - _phase(launchIntroReveal, _taglineOut),
+    // Nothing under it takes a touch, and the first one ends the show.
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) => _skipToFade(),
+      child: AbsorbPointer(
+        key: launchIntroOverlayKey,
+        child: ExcludeSemantics(
+          child: AnnotatedRegion(
+            value: systemBarsStyle(iconsOnBackground),
+            // The overlay sits above the Navigator, outside any screen's
+            // Material, so its text would get the debug underline without one.
+            child: Material(
+              type: MaterialType.transparency,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ColoredBox(color: background.withValues(alpha: 1 - fade)),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: centre.bottom + _taglineGap,
+                    child: _taglineLine(
+                      context,
+                      AppPalette.of(platform).text,
+                      1 - _phase(launchIntroReveal, _taglineOut),
+                    ),
                   ),
-                ),
-                _tile(
-                  rect: Rect.lerp(centre, target ?? centre, flight)!,
-                  color: Color.lerp(
-                    start.tile,
-                    context.colors.primary,
-                    flight,
-                  )!,
-                  glyph: Color.lerp(start.glyph, tokens.primaryIcon, flight)!,
-                  // On the header's tile the overlay's tile only hides, once
-                  // the background is gone. With nowhere to land it fades too.
-                  opacity: target == null ? 1 - fade : 1,
-                ),
-              ],
+                  _tile(
+                    rect: Rect.lerp(centre, target ?? centre, flight)!,
+                    color: Color.lerp(
+                      start.tile,
+                      context.colors.primary,
+                      flight,
+                    )!,
+                    glyph: Color.lerp(start.glyph, tokens.primaryIcon, flight)!,
+                    // On the header's tile the overlay's tile only hides, once
+                    // the background is gone. With nowhere to land it fades too.
+                    opacity: target == null ? 1 - fade : 1,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

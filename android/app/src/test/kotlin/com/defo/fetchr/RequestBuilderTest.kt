@@ -124,6 +124,25 @@ class RequestBuilderTest {
     }
 
     @Test
+    fun saveFolder_isTheUserFolderOutsideAPlaylist() {
+        assertEquals("Fetchr", RequestBuilder.saveFolder(request(Quality.BEST)))
+        assertEquals("Fetchr", RequestBuilder.saveFolder(request(Quality.BEST).copy(folder = "../")))
+    }
+
+    @Test
+    fun saveFolder_putsAPlaylistInASafeSubfolder() {
+        fun folderFor(title: String) = RequestBuilder.saveFolder(request(Quality.MP3).copy(playlistTitle = title))
+
+        assertEquals("Fetchr/Road trip", folderFor("Road trip"))
+        assertEquals("Fetchr/ACDC Live", folderFor("AC/DC: Live"))
+        assertEquals("Fetchr/etc", folderFor("../../etc"))
+        assertEquals("Fetchr/" + "a".repeat(150), folderFor("a".repeat(200)))
+        for (blank in listOf("", "  ", "..", "/|\\")) {
+            assertEquals("for '$blank'", "Fetchr", folderFor(blank))
+        }
+    }
+
+    @Test
     fun info_buildsFlatJsonDump() {
         val cmd = RequestBuilder.info(url, cacheDir).buildCommand()
         assertEquals(listOf("-J", "--flat-playlist", "--cache-dir", ytDlpCache, url), cmd)
@@ -309,6 +328,22 @@ class RequestBuilderTest {
         val cmd = RequestBuilder.download(evil, outDir, cacheDir, noBackupDir).buildCommand()
         assertTrue(cmd.none { it.contains("evil") })
         assertEquals(template, cmd[cmd.indexOf("-o") + 1])
+    }
+
+    @Test
+    fun download_numbersPlaylistEntriesPaddedToThePlaylistWidth() {
+        fun outputFor(index: Long?, count: Long?): String {
+            val req = request(Quality.BEST).copy(playlistTitle = "P", playlistIndex = index, playlistCount = count)
+            val cmd = RequestBuilder.download(req, outDir, cacheDir, noBackupDir).buildCommand()
+            return cmd[cmd.indexOf("-o") + 1]
+        }
+        fun numbered(prefix: String) = File(outDir, "$prefix - %(title).150B [%(id)s].%(ext)s").path
+
+        assertEquals(numbered("03"), outputFor(3, 9))
+        assertEquals(numbered("07"), outputFor(7, 18))
+        assertEquals(numbered("042"), outputFor(42, 150))
+        assertEquals(numbered("05"), outputFor(5, null))
+        assertEquals(template, outputFor(null, null))
     }
 
     @Test

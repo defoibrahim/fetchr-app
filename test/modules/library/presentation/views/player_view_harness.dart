@@ -61,6 +61,7 @@ late List<String> events;
 late StreamController<bool> playing;
 late StreamController<Duration> position;
 late StreamController<Duration> duration;
+late StreamController<int?> width;
 late StreamController<String> errors;
 late GoRouter router;
 late List<MethodCall> platformCalls;
@@ -72,18 +73,21 @@ void setUpPlayerHarness() {
   playing = StreamController<bool>.broadcast();
   position = StreamController<Duration>.broadcast();
   duration = StreamController<Duration>.broadcast();
+  width = StreamController<int?>.broadcast();
   errors = StreamController<String>.broadcast(
     onCancel: () => events.add('cancel errors'),
   );
   addTearDown(playing.close);
   addTearDown(position.close);
   addTearDown(duration.close);
+  addTearDown(width.close);
   addTearDown(errors.close);
 
   final streams = MockMediaPlayerStream();
   when(() => streams.playing).thenAnswer((_) => playing.stream);
   when(() => streams.position).thenAnswer((_) => position.stream);
   when(() => streams.duration).thenAnswer((_) => duration.stream);
+  when(() => streams.width).thenAnswer((_) => width.stream);
   when(() => streams.error).thenAnswer((_) => errors.stream);
 
   player = MockMediaPlayer();
@@ -91,6 +95,7 @@ void setUpPlayerHarness() {
   when(() => player.state).thenReturn(const PlayerState());
   when(() => player.open(any())).thenAnswer((_) async {});
   when(() => player.playOrPause()).thenAnswer((_) async {});
+  when(() => player.pause()).thenAnswer((_) async {});
   when(() => player.seek(any())).thenAnswer((_) async {});
   when(() => player.dispose()).thenAnswer((_) async {
     events.add('dispose player');
@@ -113,6 +118,10 @@ Future<void> pumpPlayer(
   Size size = designSize,
   TextDirection textDirection = TextDirection.ltr,
   Future<Result<List<LibraryItem>>> Function()? list,
+  // As the app routes it: a MaterialPage that animates in and out.
+  bool animatedRoute = false,
+  // Called each time the page binds a video surface (a VideoController).
+  VoidCallback? onSurface,
 }) async {
   useView(tester, size);
   tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -139,10 +148,15 @@ Future<void> pumpPlayer(
       ),
       GoRoute(
         path: AppRoutes.player,
-        builder: (_, state) => PlayerView(
-          uri: state.uri.queryParameters['uri']!,
-          title: state.uri.queryParameters['title'] ?? '',
-        ),
+        pageBuilder: (_, state) {
+          final view = PlayerView(
+            uri: state.uri.queryParameters['uri']!,
+            title: state.uri.queryParameters['title'] ?? '',
+          );
+          return animatedRoute
+              ? MaterialPage<void>(key: state.pageKey, child: view)
+              : NoTransitionPage<void>(key: state.pageKey, child: view);
+        },
       ),
     ],
   );
@@ -154,10 +168,10 @@ Future<void> pumpPlayer(
         downloaderRepositoryProvider.overrideWithValue(downloader),
         appStorageProvider.overrideWithValue(MemoryStorage()),
         playerFactoryProvider.overrideWithValue(() => player),
-        videoSurfaceFactoryProvider.overrideWithValue(
-          (_) =>
-              (_) => const SizedBox.expand(key: videoKey),
-        ),
+        videoSurfaceFactoryProvider.overrideWithValue((_) {
+          onSurface?.call();
+          return (_) => const SizedBox.expand(key: videoKey);
+        }),
       ],
       child: ScaleScope(
         child: MaterialApp.router(
@@ -189,9 +203,18 @@ Future<void> emit<T>(
 Finder inControls(Finder finder) =>
     find.descendant(of: find.byType(PlayerControls), matching: finder);
 
-double overlayOpacity(WidgetTester tester) => tester
-    .widget<AnimatedOpacity>(inControls(find.byType(AnimatedOpacity)).first)
-    .opacity;
+// The overlay's own fade: the outermost one above the slider, never the video's first-frame fade.
+AnimatedOpacity overlayFade(WidgetTester tester) =>
+    tester.widget<AnimatedOpacity>(
+      find
+          .ancestor(
+            of: inControls(find.byType(Slider)),
+            matching: find.byType(AnimatedOpacity),
+          )
+          .last,
+    );
+
+double overlayOpacity(WidgetTester tester) => overlayFade(tester).opacity;
 
 // A single tap waits out the double-tap window before it counts.
 Future<void> tapMedia(WidgetTester tester, Offset at) async {

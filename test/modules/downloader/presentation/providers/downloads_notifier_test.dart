@@ -211,4 +211,156 @@ void main() {
       verify(() => openFolder('uri')).called(1);
     });
   });
+
+  group('a pause, resume or cancel shows ahead of native', () {
+    final running = downloadTask(id: 'a', status: TaskStatus.running);
+    final paused = downloadTask(id: 'a', status: TaskStatus.paused);
+    final canceled = downloadTask(id: 'a', status: TaskStatus.canceled);
+
+    TaskStatus shown() => state().requireValue.single.status;
+
+    Future<void> snapshot(DownloadTask task) async {
+      tasks.add([task]);
+      await pumpEventQueue();
+    }
+
+    test('pause shows paused at once and settles on the snapshot', () async {
+      final reply = Completer<Result<void>>();
+      when(() => pause('a')).thenAnswer((_) => reply.future);
+      await snapshot(running);
+
+      final done = notifier().pause('a');
+      expect(shown(), TaskStatus.paused);
+      expect(notifier().isSettling('a'), isTrue);
+
+      // A tick sent before native paused it keeps the guess on screen.
+      await snapshot(running);
+      expect(shown(), TaskStatus.paused);
+      expect(notifier().isSettling('a'), isTrue);
+
+      reply.complete(const Ok(null));
+      await done;
+      expect(notifier().isSettling('a'), isTrue);
+
+      await snapshot(paused);
+      expect(shown(), TaskStatus.paused);
+      expect(notifier().isSettling('a'), isFalse);
+    });
+
+    test(
+      'the first snapshot after the answer wins, whatever it says',
+      () async {
+        when(() => pause('a')).thenAnswer((_) async => const Ok(null));
+        await snapshot(running);
+        await notifier().pause('a');
+        expect(shown(), TaskStatus.paused);
+
+        // Native finished it before the pause landed.
+        await snapshot(downloadTask(id: 'a', status: TaskStatus.completed));
+        expect(shown(), TaskStatus.completed);
+        expect(notifier().isSettling('a'), isFalse);
+
+        // A running snapshot after the answer is native's truth too.
+        when(() => resume('a')).thenAnswer((_) async => const Ok(null));
+        await snapshot(paused);
+        await notifier().resume('a');
+        await snapshot(paused);
+        expect(shown(), TaskStatus.paused);
+        expect(notifier().isSettling('a'), isFalse);
+      },
+    );
+
+    test('a snapshot that already shows it settles on the answer', () async {
+      final reply = Completer<Result<void>>();
+      when(() => pause('a')).thenAnswer((_) => reply.future);
+      await snapshot(running);
+      final done = notifier().pause('a');
+      await snapshot(paused);
+      expect(notifier().isSettling('a'), isFalse);
+
+      reply.complete(const Ok(null));
+      await done;
+      expect(notifier().isSettling('a'), isFalse);
+      expect(shown(), TaskStatus.paused);
+    });
+
+    test('a failed pause puts the task back as native has it', () async {
+      final reply = Completer<Result<void>>();
+      when(() => pause('a')).thenAnswer((_) => reply.future);
+      await snapshot(running);
+
+      final done = notifier().pause('a');
+      expect(shown(), TaskStatus.paused);
+
+      reply.complete(const Err(failure));
+      expect(await done, const Err<void>(failure));
+      expect(shown(), TaskStatus.running);
+      expect(notifier().isSettling('a'), isFalse);
+    });
+
+    test(
+      'resume shows running at once; a failure brings paused back',
+      () async {
+        final reply = Completer<Result<void>>();
+        when(() => resume('a')).thenAnswer((_) => reply.future);
+        await snapshot(paused);
+
+        final done = notifier().resume('a');
+        expect(shown(), TaskStatus.running);
+
+        reply.complete(const Err(failure));
+        await done;
+        expect(shown(), TaskStatus.paused);
+      },
+    );
+
+    test('a resumed task native queues settles as queued', () async {
+      when(() => resume('a')).thenAnswer((_) async => const Ok(null));
+      await snapshot(paused);
+      final done = notifier().resume('a');
+      await snapshot(downloadTask(id: 'a', status: TaskStatus.queued));
+      await done;
+      expect(shown(), TaskStatus.queued);
+      expect(notifier().isSettling('a'), isFalse);
+    });
+
+    test('cancel shows the cancelled card at once', () async {
+      final reply = Completer<Result<void>>();
+      when(() => cancel('a')).thenAnswer((_) => reply.future);
+      await snapshot(paused);
+
+      final done = notifier().cancel('a');
+      expect(shown(), TaskStatus.canceled);
+      // Still paused natively: not there yet.
+      await snapshot(paused);
+      expect(shown(), TaskStatus.canceled);
+
+      reply.complete(const Ok(null));
+      await done;
+      await snapshot(canceled);
+      expect(notifier().isSettling('a'), isFalse);
+    });
+
+    test('a task native stops reporting forgets its guess', () async {
+      when(
+        () => pause('a'),
+      ).thenAnswer((_) => Completer<Result<void>>().future);
+      await snapshot(running);
+      unawaited(notifier().pause('a'));
+      tasks.add([]);
+      await pumpEventQueue();
+      expect(notifier().isSettling('a'), isFalse);
+      expect(state().requireValue, isEmpty);
+    });
+
+    test('an answer after dispose changes nothing', () async {
+      final reply = Completer<Result<void>>();
+      when(() => pause('a')).thenAnswer((_) => reply.future);
+      await snapshot(running);
+      final done = notifier().pause('a');
+      container.dispose();
+      reply.complete(const Ok(null));
+      expect(await done, const Ok<void>(null));
+    });
+  });
 }

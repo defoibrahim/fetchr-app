@@ -13,6 +13,7 @@ import '../domain/usecases/open_download_folder_usecase.dart';
 import '../domain/usecases/pause_all_downloads_usecase.dart';
 import '../domain/usecases/pause_download_usecase.dart';
 import '../domain/usecases/remove_download_usecase.dart';
+import '../domain/usecases/reorder_queue_usecase.dart';
 import '../domain/usecases/resume_all_downloads_usecase.dart';
 import '../domain/usecases/resume_download_usecase.dart';
 import '../domain/usecases/retry_download_usecase.dart';
@@ -40,6 +41,10 @@ final cancelDownloadUseCaseProvider = Provider<CancelDownloadUseCase>(
 
 final retryDownloadUseCaseProvider = Provider<RetryDownloadUseCase>(
   (ref) => RetryDownloadUseCase(ref.watch(downloaderRepositoryProvider)),
+);
+
+final reorderQueueUseCaseProvider = Provider<ReorderQueueUseCase>(
+  (ref) => ReorderQueueUseCase(ref.watch(downloaderRepositoryProvider)),
 );
 
 final pauseDownloadUseCaseProvider = Provider<PauseDownloadUseCase>(

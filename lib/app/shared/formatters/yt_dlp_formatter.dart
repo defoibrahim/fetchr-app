@@ -1,3 +1,4 @@
+import '../../../core/config/environment.dart';
 import '../../../core/utils/dates.dart';
 import '../../../core/utils/formatters.dart';
 import '../domain/entities/yt_dlp_status.dart';
@@ -16,6 +17,10 @@ extension YtDlpUpdatePhaseFormat on YtDlpUpdatePhase {
   String get actionLabel =>
       this == YtDlpUpdatePhase.done ? 'Check again' : 'Update yt-dlp';
 }
+
+/// Said once an update installed [version] for the next launch.
+String ytDlpPendingCaption(String version) =>
+    'Updated to $version — restart ${Environment.current.appName} to use it';
 
 /// The caption under the version, or null when there is nothing to say: idle
 /// with no status read yet. Only an idle phase reads the clock.

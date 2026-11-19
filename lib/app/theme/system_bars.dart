@@ -38,6 +38,10 @@ class SystemBars extends StatelessWidget {
 SystemUiOverlayStyle systemBarsStyle(Brightness icons) => SystemUiOverlayStyle(
   statusBarColor: Colors.transparent,
   statusBarIconBrightness: icons,
+  // iOS ignores the icon brightness and reads the bar's own brightness.
+  statusBarBrightness: icons == Brightness.dark
+      ? Brightness.light
+      : Brightness.dark,
   systemNavigationBarColor: Colors.transparent,
   systemNavigationBarIconBrightness: icons,
   // The shell draws its own 1 dp line; the system adds neither a divider nor a

@@ -313,7 +313,7 @@ void main() {
       await pump(tester, app: app, location: AppRoutes.downloads);
       final list = find
           .descendant(
-            of: find.byType(ListView),
+            of: find.byType(CustomScrollView),
             matching: find.byType(Scrollable),
           )
           .first;

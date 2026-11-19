@@ -280,6 +280,49 @@ void main() {
         expect(find.text('Play'), findsNothing);
       });
 
+      testWidgets('the panel grows in, and a tap while it closes reopens it', (
+        tester,
+      ) async {
+        useView(tester);
+        await tester.pumpWidget(
+          themed(
+            Align(
+              alignment: Alignment.topRight,
+              child: MoreActionsButton(items: items([])),
+            ),
+            theme: theme,
+          ),
+        );
+        expect(
+          tester.widget<MenuAnchor>(find.byType(MenuAnchor)).animated,
+          isTrue,
+        );
+
+        await tester.tap(find.byTooltip('More actions'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('More actions'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        // Still on screen, fading out: a tap brings it back.
+        expect(find.text('Play'), findsOneWidget);
+        await tester.tap(find.byTooltip('More actions'));
+        await tester.pumpAndSettle();
+        expect(find.text('Play'), findsOneWidget);
+      });
+
+      testWidgets('reduce motion: the panel is not animated', (tester) async {
+        reduceMotion(tester);
+        await pumpMenu(tester, theme, []);
+        expect(
+          tester.widget<MenuAnchor>(find.byType(MenuAnchor)).animated,
+          isFalse,
+        );
+        await tester.tap(find.text('open'));
+        await tester.pump();
+        await tester.pump();
+        expect(find.text('Play').hitTestable(), findsOneWidget);
+      });
+
       testWidgets('MoreActionsButton announces the label to a screen reader', (
         tester,
       ) async {

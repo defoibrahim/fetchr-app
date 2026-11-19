@@ -9,6 +9,9 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import '../../../../app/routes/app_routes.dart';
 import '../../../../app/shared/domain/entities/quality.dart';
 import '../../../../app/shared/download_prefs_provider.dart';
+import '../../../../app/shared/formatters/yt_dlp_formatter.dart';
+import '../../../../app/shared/launch_logo_target.dart';
+import '../../../../app/shared/platform_traits_provider.dart';
 import '../../../../app/shared/yt_dlp_provider.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../../core/errors/failure_mapper.dart';
@@ -18,9 +21,11 @@ import '../../../../core/logging/app_logger.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/theme_extensions.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/haptics.dart';
 import '../../../../core/utils/scale.dart';
 import '../../../../core/utils/widget_utils.dart';
 import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/app_reveal.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/centered_content.dart';
 import '../../../../core/widgets/error_card.dart';
@@ -34,6 +39,7 @@ import 'widgets/fetch_error_card.dart';
 import 'widgets/format_sheet.dart';
 import 'widgets/home_header.dart';
 import 'widgets/home_recent.dart';
+import 'widgets/playlist_choice_dialog.dart';
 import 'widgets/url_field.dart';
 
 const _heroGap = 20.0;
@@ -59,6 +65,7 @@ class _HomeViewState extends ConsumerState<HomeView>
   // the notifier so Lower quality can reopen the sheet on it.
   ({Quality quality, int needed, int free})? _storage;
   bool _sheetOpen = false;
+  bool _choosing = false;
 
   HomeNotifier get _notifier => ref.read(homeNotifierProvider.notifier);
 
@@ -109,6 +116,8 @@ class _HomeViewState extends ConsumerState<HomeView>
   void _onShared(List<SharedMediaFile> files) {
     final url = files.map((f) => f.path.firstUrl).nonNulls.firstOrNull;
     if (url == null || !mounted) return;
+    // The sheet opens at once; a launch intro still playing would cover it.
+    LaunchLogoTarget.skipIntroOf(context);
     // A hidden tab pauses this screen's listeners, so the sheet would wait
     // for the user to open Home.
     context.go(AppRoutes.home);
@@ -135,6 +144,7 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   Future<void> _checkClipboard() async {
+    if (!ref.read(platformTraitsProvider).readsClipboardOnResume) return;
     final text = await _clipboardText();
     if (!mounted) return;
     _clipboard.check(clipboardText: text, fieldText: _controller.text);
@@ -176,8 +186,29 @@ class _HomeViewState extends ConsumerState<HomeView>
 
   void _fetch() {
     final url = _controller.text.firstUrl;
-    if (url == null || _sheetOpen) return;
+    if (url == null || _sheetOpen || _choosing) return;
     FocusManager.instance.primaryFocus?.unfocus();
+    final videoOnly = url.videoWithoutPlaylist;
+    if (videoOnly == null) return _start(url);
+    unawaited(_choosePlaylist(url, videoOnly));
+  }
+
+  Future<void> _choosePlaylist(String url, String videoOnly) async {
+    _choosing = true;
+    final bool? whole;
+    try {
+      whole = await showPlaylistChoice(context);
+    } finally {
+      _choosing = false;
+    }
+    if (!mounted || whole == null) return;
+    if (whole) return _start(url);
+    // The field shows what is fetched, so a finished download clears it.
+    _setUrl(videoOnly);
+    _start(videoOnly);
+  }
+
+  void _start(String url) {
     setState(() => _storage = null);
     // Riverpod keeps the last result through AsyncLoading; clearing first
     // means nothing reads a stale video or error while this one loads.
@@ -256,6 +287,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     // Consume the result so the same link can be fetched again.
     _notifier.clear();
     if (result.isOk) {
+      AppHaptics.confirm();
       // A link shared while the sheet was open stays for the next fetch.
       if (_controller.text.firstUrl == info.url) _controller.clear();
       _showAdded('Added to Downloads');
@@ -266,7 +298,10 @@ class _HomeViewState extends ConsumerState<HomeView>
   Future<void> _convertVideo() async {
     final result = await _notifier.convertVideo();
     if (!mounted) return;
-    if (result case Ok(value: true)) _showAdded('Converting to MP3');
+    if (result case Ok(value: true)) {
+      AppHaptics.confirm();
+      _showAdded('Converting to MP3');
+    }
     await AppSnackbar.showFailure(context, result);
   }
 
@@ -280,7 +315,11 @@ class _HomeViewState extends ConsumerState<HomeView>
   Future<void> _updateYtDlp() async {
     final result = await ref.read(ytDlpProvider.notifier).updateYtDlp();
     if (!mounted) return;
+    final pending = ref.read(ytDlpProvider).value?.pendingVersion;
     switch (result) {
+      // The same link would fail again on the yt-dlp still running.
+      case Ok() when pending != null:
+        AppSnackbar.show(context, ytDlpPendingCaption(pending));
       case Ok():
         _fetch();
       case Err(:final failure):
@@ -386,29 +425,42 @@ class _HomeViewState extends ConsumerState<HomeView>
                       url: failure == null ? suggestion : null,
                       onUse: _useSuggestion,
                     ),
-                    if (failure != null)
-                      Padding(
-                        padding: EdgeInsets.only(top: Gap.lg.h),
-                        child: ErrorCard(
-                          data: fetchErrorCard(
-                            failure,
-                            storage: storage == null
-                                ? null
-                                : (needed: storage.needed, free: storage.free),
-                            ytDlpPhase: phase,
-                            actions: FetchErrorActions(
-                              updateYtDlp: () => unawaited(_updateYtDlp()),
-                              editLink: _editLink,
-                              anotherLink: _anotherLink,
-                              retry: _fetch,
-                              lowerQuality: _lowerQuality,
-                              openLibrary: () => context.go(AppRoutes.library),
+                    // Revealed over 250 ms and folded over 200 when the link
+                    // is edited, so the page below moves instead of jumping.
+                    AppReveal(
+                      child: failure == null
+                          ? null
+                          : Padding(
+                              padding: EdgeInsets.only(top: Gap.lg.h),
+                              child: ErrorCard(
+                                data: fetchErrorCard(
+                                  failure,
+                                  storage: storage == null
+                                      ? null
+                                      : (
+                                          needed: storage.needed,
+                                          free: storage.free,
+                                        ),
+                                  ytDlpPhase: phase,
+                                  actions: FetchErrorActions(
+                                    updateYtDlp: () =>
+                                        unawaited(_updateYtDlp()),
+                                    editLink: _editLink,
+                                    anotherLink: _anotherLink,
+                                    retry: _fetch,
+                                    lowerQuality: _lowerQuality,
+                                    openLibrary: () =>
+                                        context.go(AppRoutes.library),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ),
+                    ),
                     SizedBox(height: Gap.lg.h),
-                    ConvertVideoTile(onTap: () => unawaited(_convertVideo())),
+                    ConvertVideoTile(
+                      deviceWord: ref.watch(platformTraitsProvider).deviceWord,
+                      onTap: () => unawaited(_convertVideo()),
+                    ),
                   ],
                 ),
               ),

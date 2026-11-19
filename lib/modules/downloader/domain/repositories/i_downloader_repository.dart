@@ -13,6 +13,9 @@ abstract interface class IDownloaderRepository {
   /// Resumes from the kept partial file, or starts over when none is left.
   Future<Result<void>> retry(String id);
 
+  /// The queued tasks of [ids] start in that order.
+  Future<Result<void>> reorder(List<String> ids);
+
   Future<Result<void>> pause(String id);
 
   Future<Result<void>> resume(String id);

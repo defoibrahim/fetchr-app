@@ -98,8 +98,10 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.byType(LoadingView), findsOneWidget);
-      expect(find.byType(ErrorView), findsNothing);
+      // The first spinner may still be fading out behind the new one.
+      expect(find.byType(LoadingView).hitTestable(), findsOneWidget);
+      // The error fades out and takes no taps on the way.
+      expect(find.byType(ErrorView).hitTestable(), findsNothing);
 
       reloaded.add([done()]);
       await tester.pump();
@@ -172,6 +174,8 @@ void main() {
       expect(find.byType(DoneRow), findsNothing);
 
       await emit(tester, [done('a')]);
+      // The card holds "Saved" a moment, then gives way to its Done row.
+      await tester.pumpAndSettle();
 
       expect(find.byType(DownloadCard), findsNothing);
       expect(find.byType(DoneRow), findsOneWidget);
@@ -243,7 +247,8 @@ void main() {
       await tester.tap(find.byTooltip('Remove'));
       await tester.pump();
 
-      expect(find.byType(DownloadCard), findsNothing);
+      // It folds away, taking no taps.
+      expect(find.byType(DownloadCard).hitTestable(), findsNothing);
       expect(find.text('Removed'), findsOneWidget);
       verifyNever(() => remove(any()));
 
@@ -279,6 +284,7 @@ void main() {
       await tester.pump();
 
       await emit(tester, [cancelled, running('b')]);
+      await tester.pump(const Duration(milliseconds: 350));
 
       final shown = tester.widgetList<DownloadCard>(find.byType(DownloadCard));
       expect(shown.map((card) => card.task.id), ['b']);

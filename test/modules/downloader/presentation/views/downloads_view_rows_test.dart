@@ -62,7 +62,8 @@ void main() {
       await tester.tap(find.byTooltip('Remove'));
       await tester.pump();
 
-      expect(find.byType(AttentionRow), findsNothing);
+      // It folds away, taking no taps.
+      expect(find.byType(AttentionRow).hitTestable(), findsNothing);
       verifyNever(() => remove(any()));
 
       await pumpSnackbarIn(tester);
@@ -77,6 +78,7 @@ void main() {
 
       await tester.tap(find.byTooltip('Remove').last);
       await tester.pump();
+      await pumpRowGone(tester);
 
       final left = tester.widgetList<AttentionRow>(find.byType(AttentionRow));
       expect(left.map((row) => row.task.id), ['b']);
@@ -118,6 +120,24 @@ void main() {
         expect(find.text(line), findsOneWidget);
         expect(find.text('Copy'), findsOneWidget);
         expect(find.text('Close'), findsOneWidget);
+      });
+
+      testWidgets('the row ripples and tells a screen reader what a tap does', (
+        tester,
+      ) async {
+        final semantics = tester.ensureSemantics();
+        await pumpUnknown(tester, message: line);
+
+        final row = find.ancestor(
+          of: find.text('Download failed').first,
+          matching: find.byType(InkWell),
+        );
+        expect(row, findsOneWidget);
+        expect(
+          tester.getSemantics(row),
+          isSemantics(hasTapAction: true, onTapHint: 'Show error details'),
+        );
+        semantics.dispose();
       });
 
       testWidgets('Copy copies it and says so', (tester) async {
@@ -219,7 +239,7 @@ void main() {
       await pumpWith(tester, [done()]);
 
       await tester.longPress(find.text('Video d'));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(find.text('Play'), findsOneWidget);
       expect(find.text('Show in folder'), findsOneWidget);
@@ -229,7 +249,7 @@ void main() {
     testWidgets('the menu plays the file', (tester) async {
       await pumpWith(tester, [done('d', 'content://media/7')]);
       await tester.longPress(find.text('Video d'));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Play'));
       await tester.pumpAndSettle();
@@ -240,7 +260,7 @@ void main() {
     testWidgets('the menu shows the file in its folder', (tester) async {
       await pumpWith(tester, [done('d', 'content://media/7')]);
       await tester.longPress(find.text('Video d'));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Show in folder'));
       await tester.pump();
@@ -254,7 +274,7 @@ void main() {
       ).thenAnswer((_) async => const Err<void>(UnexpectedFailure()));
       await pumpWith(tester, [done()]);
       await tester.longPress(find.text('Video d'));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Show in folder'));
       await tester.pump();
@@ -265,7 +285,7 @@ void main() {
 
     Future<void> openDeleteDialog(WidgetTester tester) async {
       await tester.longPress(find.text('Video d'));
-      await tester.pump();
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Delete file'));
       await tester.pumpAndSettle();
     }
@@ -275,7 +295,7 @@ void main() {
     ) async {
       await pumpWith(tester, [done('d', null, 'Cliffside')]);
       await tester.longPress(find.text('Cliffside'));
-      await tester.pump();
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Delete file'));
       await tester.pumpAndSettle();
 
@@ -311,7 +331,8 @@ void main() {
       await tester.tap(find.text('Delete'));
       await tester.pump();
 
-      expect(find.byType(DoneRow), findsNothing);
+      // It folds away, taking no taps.
+      expect(find.byType(DoneRow).hitTestable(), findsNothing);
       expect(find.text('Deleted'), findsOneWidget);
       verifyNever(() => remove(any()));
 

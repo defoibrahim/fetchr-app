@@ -4,10 +4,9 @@ import '../../../../../core/theme/app_spacing.dart';
 import '../../../../../core/theme/theme_extensions.dart';
 import '../../../../../core/utils/scale.dart';
 import '../../../../../core/widgets/app_button.dart';
+import '../../../../../core/widgets/app_reveal.dart';
 import '../../../../../core/widgets/dashed_border.dart';
 
-const _appear = Duration(milliseconds: 200);
-const _slide = 8.0;
 const _marginTop = 16.0;
 const _padTop = 12.0;
 const _padStart = 14.0;
@@ -16,7 +15,7 @@ const _captionGap = 3.0;
 
 /// "Link found on your clipboard" with a Use button. A null [url] hides it:
 /// it fades and collapses, and appears with a fade and an 8 dp rise.
-class ClipboardSuggestion extends StatefulWidget {
+class ClipboardSuggestion extends StatelessWidget {
   const ClipboardSuggestion({
     super.key,
     required this.url,
@@ -26,55 +25,18 @@ class ClipboardSuggestion extends StatefulWidget {
   final String? url;
   final VoidCallback onUse;
 
-  @override
-  State<ClipboardSuggestion> createState() => _ClipboardSuggestionState();
-}
-
-class _ClipboardSuggestionState extends State<ClipboardSuggestion> {
-  // Kept after the URL goes so the card has something to fade out.
-  String? _shown;
-
-  @override
-  void initState() {
-    super.initState();
-    _shown = widget.url;
-  }
-
-  @override
-  void didUpdateWidget(ClipboardSuggestion oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _shown = widget.url ?? _shown;
-  }
-
+  // AppReveal keeps the last card while it leaves, so a hidden one needs no
+  // URL of its own.
   @override
   Widget build(BuildContext context) {
-    final url = _shown;
-    if (url == null) return const SizedBox.shrink();
-    return TweenAnimationBuilder<double>(
-      // Begins at 0 so a card that is just built still rises and fades in.
-      tween: Tween<double>(begin: 0, end: widget.url == null ? 0 : 1),
-      duration: context.motion(_appear),
-      curve: Curves.easeOut,
-      builder: (context, t, child) {
-        if (t == 0 && widget.url == null) return const SizedBox.shrink();
-        return Opacity(
-          opacity: t,
-          child: ClipRect(
-            child: Align(
-              alignment: Alignment.topCenter,
-              heightFactor: t,
-              child: Transform.translate(
-                offset: Offset(0, (1 - t) * _slide.h),
-                child: child,
-              ),
+    final url = this.url;
+    return AppReveal(
+      child: url == null
+          ? null
+          : Padding(
+              padding: EdgeInsets.only(top: _marginTop.h),
+              child: _Card(url: url, onUse: onUse),
             ),
-          ),
-        );
-      },
-      child: Padding(
-        padding: EdgeInsets.only(top: _marginTop.h),
-        child: _Card(url: url, onUse: widget.onUse),
-      ),
     );
   }
 }

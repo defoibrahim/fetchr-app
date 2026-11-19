@@ -2,8 +2,10 @@ import 'dart:ui' show SemanticsRole;
 
 import 'package:flutter/material.dart';
 
+import '../theme/app_motion.dart';
 import '../theme/app_spacing.dart';
 import '../theme/theme_extensions.dart';
+import '../utils/haptics.dart';
 import '../utils/scale.dart';
 
 /// A row of equal pills in a padded track, one selected. `height` is the
@@ -24,8 +26,6 @@ class SegmentedPills<T> extends StatelessWidget {
     this.semanticLabel,
   });
 
-  static const _fade = Duration(milliseconds: 150);
-
   final List<(T, String)> items;
   final T selected;
   final ValueChanged<T> onChanged;
@@ -40,7 +40,7 @@ class SegmentedPills<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     final type = context.type;
-    final fade = context.motion(_fade);
+    final fade = context.motion(Motion.fast);
     final label =
         (mono ? (context.isNarrow ? type.monoSmall : type.mono) : type.body)
             .copyWith(fontWeight: FontWeight.w500);
@@ -70,7 +70,10 @@ class SegmentedPills<T> extends StatelessWidget {
                   height: height.h,
                   radius: pillRadius.r,
                   fade: fade,
-                  onTap: () => onChanged(value),
+                  onTap: () {
+                    if (value != selected) AppHaptics.select();
+                    onChanged(value);
+                  },
                 ),
               ),
           ],

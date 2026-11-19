@@ -18,6 +18,18 @@ void main() {
     expect(Quality.cover.savePath('Fetchr'), 'Pictures/Fetchr');
   });
 
+  test('a playlist adds the subfolder native names after it', () {
+    String of(String title) => Quality.mp3.savePath('Fetchr', playlist: title);
+
+    expect(of('Road trip'), 'Music/Fetchr/Road trip');
+    expect(of('AC/DC: Live'), 'Music/Fetchr/ACDC Live');
+    expect(of('../../etc'), 'Music/Fetchr/etc');
+    expect(of('a' * 200), 'Music/Fetchr/${'a' * 150}');
+    for (final blank in ['', '  ', '..', r'/|\']) {
+      expect(of(blank), 'Music/Fetchr', reason: 'for "$blank"');
+    }
+  });
+
   test('short labels are the pill texts in settings and the playlist', () {
     expect(Quality.values.map((q) => q.shortLabel), [
       'Best',

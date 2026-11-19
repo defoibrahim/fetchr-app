@@ -56,6 +56,7 @@ DownloadTask downloadTask({
   String? errorCode,
   String? errorMessage,
   String? savedUri,
+  String? savedPath,
   DateTime? createdAt,
   DateTime? finishedAt,
 }) => DownloadTask(
@@ -74,7 +75,38 @@ DownloadTask downloadTask({
   failure: failure ?? (errorCode == null ? null : failureFromCode(errorCode)),
   errorMessage: errorMessage,
   savedUri: savedUri,
+  savedPath: savedPath,
   createdAt: createdAt ?? DateTime.utc(2026),
+  finishedAt: finishedAt,
+);
+
+/// Video [index] of the playlist [playlist], with the id `v<index>`.
+DownloadTask playlistTask(
+  int index, {
+  String playlist = 'Road trip',
+  TaskStatus status = TaskStatus.queued,
+  double progress = 0,
+  int? downloadedBytes,
+  int? totalBytes,
+  int? speed,
+  String? errorCode,
+  DateTime? finishedAt,
+}) => downloadTask(
+  id: 'v$index',
+  request: downloadRequest(
+    url: 'https://www.youtube.com/watch?v=$index',
+    title: 'Video $index',
+    playlistTitle: playlist,
+    playlistIndex: index,
+    playlistCount: 36,
+  ),
+  status: status,
+  stage: TaskStage.downloading,
+  progress: progress,
+  downloadedBytes: downloadedBytes,
+  totalBytes: totalBytes,
+  speed: speed,
+  errorCode: errorCode,
   finishedAt: finishedAt,
 );
 
